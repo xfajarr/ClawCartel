@@ -5,6 +5,7 @@ import { PixelAvatar } from "@/app/_components/PixelAvatar";
 import { Button } from "@/app/_components/ui/button";
 import { ScrollArea } from "@/app/_components/ui/scroll-area";
 import { Textarea } from "@/app/_components/ui/textarea";
+import { useSocketChat } from "@/app/_hooks/useSocketChat";
 import { useSolana } from "@/app/_providers/SolanaProvider";
 import { cn, getSolanaColorById, truncateId } from "@/app/_libs/utils";
 import { MessageSquareIcon, Paperclip, SendIcon, WalletIcon } from "lucide-react";
@@ -74,6 +75,7 @@ export interface ChatPanelProps {
   title?: string;
   emptyPlaceholder?: React.ReactNode;
   className?: string;
+  roomId?: string;
   initialMessages?: ChatMessage[];
   onSend?: (message: string) => void;
 }
@@ -81,27 +83,29 @@ export interface ChatPanelProps {
 export function ChatPanel({
   emptyPlaceholder,
   className,
+  roomId = "global",
   initialMessages = [],
   onSend,
 }: ChatPanelProps) {
-  const { isConnected, setOpen: setWalletOpen } = useSolana();
-  const [messages, setMessages] = React.useState<ChatMessage[]>(initialMessages);
+  const { isConnected: isWalletConnected, setOpen: setWalletOpen, selectedAccount, selectedWallet } =
+    useSolana();
+  const socketChat = useSocketChat({
+    roomId,
+    senderId: selectedAccount?.address ?? null,
+    senderName: selectedWallet?.name ?? (selectedAccount ? truncateId(selectedAccount.address) : null),
+    initialMessages: isWalletConnected ? [] : initialMessages,
+  });
+  const messages = isWalletConnected ? socketChat.messages : initialMessages;
+  const sendMessage = isWalletConnected ? socketChat.sendMessage : undefined;
   const [input, setInput] = React.useState("");
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
   const handleSend = () => {
-    if (!isConnected) return;
+    if (!isWalletConnected) return;
     const text = input.trim();
     if (!text) return;
     setInput("");
-    const userMsg: ChatMessage = {
-      id: crypto.randomUUID(),
-      senderId: "user",
-      senderName: "You",
-      content: text,
-      role: "user",
-    };
-    setMessages((prev) => [...prev, userMsg]);
+    sendMessage?.(text);
     onSend?.(text);
     requestAnimationFrame(() => scrollRef.current?.scrollIntoView({ behavior: "smooth" }));
   };
@@ -110,19 +114,14 @@ export function ChatPanel({
     const file = input.trim();
     if (!file) return;
     setInput("");
-    const userMsg: ChatMessage = {
-      id: crypto.randomUUID(),
-      senderId: "user",
-      senderName: "You",
-      content: file,
-      role: "user",
-    };
-    setMessages((prev) => [...prev, userMsg]);
+    sendMessage?.(file);
     onSend?.(file);
   };
 
+  const currentUserId = selectedAccount?.address ?? "user";
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (!isConnected) return;
+    if (!isWalletConnected) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -147,8 +146,8 @@ export function ChatPanel({
           ) : (
             messages.map((m) => {
               const { bg } = getSolanaColorById(m.senderId);
-              const isUser = m.role === "user" || m.senderId === "user";
-              const label = m.senderName ?? truncateId(m.senderId);
+              const isUser = m.role === "user" || m.senderId === "user" || m.senderId === currentUserId;
+              const label = isUser ? "You" : (m.senderName ?? truncateId(m.senderId));
               return (
                 <div
                   key={m.id}
@@ -191,7 +190,7 @@ export function ChatPanel({
 
       {/* Input */}
       <div className="border-border/50 shrink-0 border-t p-2">
-        {!isConnected ? (
+        {!isWalletConnected ? (
           <div className="text-muted-foreground flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed py-6 text-center text-sm">
             <WalletIcon className="size-8 opacity-50" />
             <p>Connect your wallet to chat</p>
