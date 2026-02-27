@@ -9,6 +9,7 @@ import {
   InputType,
   Run,
 } from '#app/modules/run/run.interface'
+import Logger from '#app/utils/logger'
 
 const execFileAsync = promisify(execFile)
 
@@ -28,44 +29,44 @@ const OPENCLAW_GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL
 const OPENCLAW_GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN
 const OPENCLAW_GATEWAY_PASSWORD = process.env.OPENCLAW_GATEWAY_PASSWORD
 
-// Preferred for local backend: call a remote MonkClaw bridge endpoint over HTTPS
 const OPENCLAW_BRIDGE_URL = process.env.OPENCLAW_BRIDGE_URL
 const OPENCLAW_BRIDGE_TOKEN = process.env.OPENCLAW_BRIDGE_TOKEN
 
 const ROLE_SYSTEM_PROMPT: Record<AgentRole, string> = {
-  pm: 'You are PM agent. Break down scope, define tasks, dependencies, and final summary.',
+  pm: 'You are PM agent. Lead direction, prioritize trade-offs, and keep discussion actionable.',
   fe: 'You are FE agent. Focus on frontend architecture, websocket rendering, and UX states.',
-  'be_sc': 'You are BE+SC agent. Focus on backend APIs, state persistence, queue flow, and Solana integration.',
+  'be_sc': 'You are BE+SC agent. Focus on backend APIs, persistence, queue flow, and Solana integration.',
   marketing: 'You are Marketing agent. Create concise positioning, launch copy, and GTM suggestions.',
 }
 
 const FALLBACK_LOGS: Record<AgentRole, string[]> = {
   pm: [
-    'PM: Breaking down the project scope and constraints',
-    'PM: Assigning FE, BE+SC, and Marketing workstreams',
-    'PM: Consolidating outputs into one execution plan',
+    'PM: Clarifying objective and expected output format',
+    'PM: Defining scope and assigning specialist focus areas',
+    'PM: Consolidating all points into a clear execution plan',
   ],
   fe: [
-    'FE: Defining mobile flow for chat/PRD input and run timeline',
-    'FE: Mapping websocket event rendering for agent bubbles',
-    'FE: Preparing reconnect + replay behavior using seq cursor',
+    'FE: Mapping chat + PRD input UX and live monitor UI states',
+    'FE: Defining websocket event rendering and reconnect behavior',
+    'FE: Proposing frontend milestones and acceptance checks',
   ],
   'be_sc': [
-    'BE+SC: Designing run/event persistence schema and indexing',
-    'BE+SC: Preparing Solana Devnet execution integration points',
-    'BE+SC: Finalizing API contract for run start and status tracking',
+    'BE+SC: Designing run/event persistence and replay model',
+    'BE+SC: Defining agent orchestration APIs and worker boundaries',
+    'BE+SC: Mapping Solana integration entry points and idempotency',
   ],
   marketing: [
-    'Marketing: Drafting ClawCartel narrative for hackathon judges',
-    'Marketing: Preparing launch message based on agent output timeline',
-    'Marketing: Proposing concise product positioning and CTA',
+    'Marketing: Drafting core narrative and positioning statement',
+    'Marketing: Building launch messaging angle per target persona',
+    'Marketing: Turning output into concise campaign/action bullets',
   ],
 }
 
-function buildRolePrompt(role: AgentRole, inputText: string): string {
+function buildRolePrompt(role: AgentRole, inputText: string, mode: 'single' | 'squad'): string {
   return [
     ROLE_SYSTEM_PROMPT[role],
-    'Context: ClawCartel run execution.',
+    `Mode: ${mode}.`,
+    'Context: ClawCartel brainstorming execution.',
     `User input: ${inputText}`,
     'Respond with concise actionable output in plain text.',
     'Keep it under 8 bullet points and include concrete next actions.',
@@ -89,9 +90,7 @@ async function checkGatewayConnectivity(): Promise<void> {
     return
   }
 
-  const args = ['health', '--json']
-
-  await execFileAsync(OPENCLAW_BIN, args, {
+  await execFileAsync(OPENCLAW_BIN, ['health', '--json'], {
     maxBuffer: 2 * 1024 * 1024,
     timeout: 15_000,
     env: {
@@ -120,7 +119,11 @@ function chunkText(text: string): string[] {
     .filter(Boolean)
 }
 
-async function runOpenClawAgent(role: AgentRole, inputText: string): Promise<{
+async function runOpenClawAgent(
+  role: AgentRole,
+  inputText: string,
+  mode: 'single' | 'squad'
+): Promise<{
   text: string
   meta: {
     model?: string
@@ -131,7 +134,7 @@ async function runOpenClawAgent(role: AgentRole, inputText: string): Promise<{
   }
 }> {
   const agentId = ROLE_AGENT_MAP[role]
-  const prompt = buildRolePrompt(role, inputText)
+  const prompt = buildRolePrompt(role, inputText, mode)
 
   if (OPENCLAW_BRIDGE_URL) {
     const res = await fetch(`${OPENCLAW_BRIDGE_URL.replace(/\/$/, '')}/api/agent/chat`, {
@@ -247,7 +250,8 @@ async function executeRole(
   run: Run,
   agentRun: AgentRun,
   role: AgentRole,
-  inputText: string
+  inputText: string,
+  mode: 'single' | 'squad'
 ): Promise<void> {
   await runService.updateAgentRun(agentRun.id, {
     status: 'running',
@@ -262,6 +266,7 @@ async function executeRole(
     message: `${role} started`,
     source: runtimeSource,
     agentId: ROLE_AGENT_MAP[role],
+    mode,
   })
 
   try {
@@ -273,7 +278,7 @@ async function executeRole(
         source: runtimeSource,
       })
 
-      const result = await runOpenClawAgent(role, inputText)
+      const result = await runOpenClawAgent(role, inputText, mode)
       latestAgentMeta = result.meta
       const chunks = chunkText(result.text)
 
@@ -326,10 +331,69 @@ async function executeRole(
   }
 }
 
+async function processRun(
+  app: FastifyInstance,
+  run: Run,
+  inputText: string,
+  mode: 'single' | 'squad',
+  roles: AgentRole[],
+  parallel: boolean
+): Promise<void> {
+  const agentRuns = await Promise.all(
+    roles.map(role =>
+      runService.createAgentRun({
+        runId: run.id,
+        role,
+        agentId: ROLE_AGENT_MAP[role],
+        status: 'queued',
+      })
+    )
+  )
+
+  await runService.updateRun(run.id, { status: 'executing' })
+
+  if (parallel) {
+    await Promise.all(
+      agentRuns.map(agentRun => executeRole(app, run, agentRun, agentRun.role as AgentRole, inputText, mode))
+    )
+  } else {
+    for (const agentRun of agentRuns) {
+      await executeRole(app, run, agentRun, agentRun.role as AgentRole, inputText, mode)
+    }
+  }
+
+  const latest = await runService.getRunWithAgentRuns(run.id)
+  const hasFailure = latest?.agentRuns.some(a => a.status === 'failed') ?? false
+
+  await runService.updateRun(run.id, {
+    status: hasFailure ? 'failed' : 'completed',
+  })
+
+  const pmOrFirst = agentRuns.find(a => a.role === 'pm') ?? agentRuns[0]
+  if (pmOrFirst) {
+    await appendAndBroadcast(app, run.id, pmOrFirst, (pmOrFirst.role as AgentRole), 'run.done', {
+      message: hasFailure ? 'Run completed with errors' : 'Run completed',
+      source: OPENCLAW_ENABLED ? (OPENCLAW_BRIDGE_URL ? 'bridge' : 'openclaw') : 'fallback',
+      mode,
+      parallel,
+      roles,
+    })
+  }
+}
+
 const AgentService = {
   startRun: async (app: FastifyInstance, body: StartRunBody): Promise<Run> => {
     const inputText = body.prdText?.trim() || body.idea?.trim() || ''
+    if (!inputText) {
+      throw new Error('idea or prdText is required')
+    }
+
     const inputType: InputType = body.source ?? (body.prdText ? 'prd' : 'chat')
+    const mode: 'single' | 'squad' = body.mode ?? 'squad'
+    const roles: AgentRole[] = mode === 'single'
+      ? [body.role ?? 'pm']
+      : ROLES
+    const parallel = mode === 'squad' ? (body.parallel ?? true) : false
 
     const run = await runService.createRun({
       inputType,
@@ -345,41 +409,11 @@ const AgentService = {
       throw new Error(`OpenClaw gateway unreachable: ${message}`)
     }
 
-    const agentRuns = await Promise.all(
-      ROLES.map(role =>
-        runService.createAgentRun({
-          runId: run.id,
-          role,
-          agentId: ROLE_AGENT_MAP[role],
-          status: 'queued',
-        })
-      )
-    )
-
-    await runService.updateRun(run.id, { status: 'executing' })
-
-    await Promise.all(
-      agentRuns.map(agentRun => {
-        const role = agentRun.role as AgentRole
-
-        return executeRole(app, run, agentRun, role, inputText)
+    void processRun(app, run, inputText, mode, roles, parallel)
+      .catch(async (error) => {
+        Logger.error({ err: error, runId: run.id }, 'Agent run processing failed')
+        await runService.updateRun(run.id, { status: 'failed' })
       })
-    )
-
-    const latest = await runService.getRunWithAgentRuns(run.id)
-    const hasFailure = latest?.agentRuns.some(a => a.status === 'failed') ?? false
-
-    await runService.updateRun(run.id, {
-      status: hasFailure ? 'failed' : 'completed',
-    })
-
-    const pmAgentRun = agentRuns.find(a => a.role === 'pm') ?? agentRuns[0]
-    if (pmAgentRun) {
-      await appendAndBroadcast(app, run.id, pmAgentRun, 'pm', 'run.done', {
-        message: hasFailure ? 'Run completed with errors' : 'Run completed',
-        source: OPENCLAW_ENABLED ? (OPENCLAW_BRIDGE_URL ? 'bridge' : 'openclaw') : 'fallback',
-      })
-    }
 
     const latestRun = await runService.getRun(run.id)
 
