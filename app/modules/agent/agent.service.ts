@@ -82,7 +82,16 @@ function chunkText(text: string): string[] {
     .filter(Boolean)
 }
 
-async function runOpenClawAgent(role: AgentRole, inputText: string): Promise<string> {
+async function runOpenClawAgent(role: AgentRole, inputText: string): Promise<{
+  text: string
+  meta: {
+    model?: string
+    provider?: string
+    sessionId?: string
+    usage?: Record<string, unknown>
+    runId?: string
+  }
+}> {
   const agentId = ROLE_AGENT_MAP[role]
   const prompt = buildRolePrompt(role, inputText)
 
@@ -111,7 +120,16 @@ async function runOpenClawAgent(role: AgentRole, inputText: string): Promise<str
     .join('\n')
     .trim()
 
-  return text || 'No response text from OpenClaw agent.'
+  return {
+    text: text || 'No response text from OpenClaw agent.',
+    meta: {
+      model: parsed?.result?.meta?.agentMeta?.model,
+      provider: parsed?.result?.meta?.agentMeta?.provider,
+      sessionId: parsed?.result?.meta?.agentMeta?.sessionId,
+      usage: parsed?.result?.meta?.agentMeta?.lastCallUsage ?? parsed?.result?.meta?.agentMeta?.usage,
+      runId: parsed?.runId,
+    },
+  }
 }
 
 async function appendAndBroadcast(
@@ -159,28 +177,34 @@ async function executeRole(
   await appendAndBroadcast(app, run.id, agentRun, role, 'agent.started', {
     message: `${role} started`,
     source: OPENCLAW_ENABLED ? 'openclaw' : 'fallback',
+    agentId: ROLE_AGENT_MAP[role],
   })
 
   try {
+    let latestAgentMeta: Record<string, unknown> | undefined
+
     if (OPENCLAW_ENABLED) {
       await appendAndBroadcast(app, run.id, agentRun, role, 'agent.delta', {
         message: `${role}: contacting OpenClaw agent...`,
         source: 'openclaw',
       })
 
-      const text = await runOpenClawAgent(role, inputText)
-      const chunks = chunkText(text)
+      const result = await runOpenClawAgent(role, inputText)
+      latestAgentMeta = result.meta
+      const chunks = chunkText(result.text)
 
       if (chunks.length === 0) {
         await appendAndBroadcast(app, run.id, agentRun, role, 'agent.delta', {
           message: `${role}: no content returned`,
           source: 'openclaw',
+          agentMeta: result.meta,
         })
       } else {
         for (const chunk of chunks) {
           await appendAndBroadcast(app, run.id, agentRun, role, 'agent.delta', {
             message: chunk,
             source: 'openclaw',
+            agentMeta: result.meta,
           })
         }
       }
@@ -196,6 +220,7 @@ async function executeRole(
     await appendAndBroadcast(app, run.id, agentRun, role, 'agent.done', {
       message: `${role} completed`,
       source: OPENCLAW_ENABLED ? 'openclaw' : 'fallback',
+      ...(latestAgentMeta ? { agentMeta: latestAgentMeta } : {}),
     })
 
     await runService.updateAgentRun(agentRun.id, {
