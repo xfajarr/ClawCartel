@@ -1,0 +1,186 @@
+"use client";
+
+import type { WebContainerStatus } from "@/app/_libs/webcontainer/core";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import dracula from "react-syntax-highlighter/dist/esm/styles/prism/dracula";
+import { FileTree } from "./FileTree";
+import { TerminalCard } from "./TerminalCard";
+
+const EDITOR_BG = "#0d0d0d";
+const LINE_NUM = "#6e7681";
+const CARET = "#f8f8f2";
+const EDITOR_FONT_SIZE = "0.875rem";
+const EDITOR_LINE_HEIGHT = "1.5rem";
+const EDITOR_PADDING = {
+  paddingTop: "0.5rem",
+  paddingRight: "1rem",
+  paddingBottom: "0.5rem",
+  paddingLeft: "0.75rem",
+};
+
+function getLanguageFromPath(path: string | null): string {
+  if (!path) return "text";
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  const map: Record<string, string> = {
+    js: "javascript",
+    jsx: "jsx",
+    ts: "typescript",
+    tsx: "tsx",
+    css: "css",
+    json: "json",
+    html: "html",
+    md: "markdown",
+  };
+  return map[ext] ?? "text";
+}
+
+export type CodeTabProps = {
+  status: WebContainerStatus;
+  terminalOutput: string;
+  code: string;
+  currentFilePath: string | null;
+  error: string | null;
+  onSelectFile: (path: string) => void;
+  onCodeChange: (code: string) => void;
+  onTreeLoad?: () => void;
+};
+
+export default function CodeTab({
+  status,
+  terminalOutput,
+  code,
+  currentFilePath,
+  error,
+  onSelectFile,
+  onCodeChange,
+  onTreeLoad,
+}: CodeTabProps) {
+  const isReady = status === "ready";
+  const breadcrumb = currentFilePath ? currentFilePath.split("/") : [];
+  const lines = code ? code.split("\n") : [];
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col border-t md:flex-row">
+        <div className="border-border flex min-h-[180px] shrink-0 flex-col border-b md:min-h-0 md:w-[220px] md:min-w-0 md:border-r md:border-b-0">
+          <div className="border-border h-10 border-b px-3 py-2">
+            <h2 className="text-foreground text-sm font-semibold">Files</h2>
+          </div>
+          <div className="min-h-0 flex-1 overflow-auto">
+            <FileTree
+              isReady={isReady}
+              selectedPath={currentFilePath}
+              onSelectFile={onSelectFile}
+              onTreeLoad={onTreeLoad}
+            />
+          </div>
+        </div>
+
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:rounded-r-lg">
+          <div className="text-muted-foreground flex h-10 shrink-0 items-center gap-1 border-b px-3 py-2 font-mono text-xs">
+            {breadcrumb.length > 0 ? (
+              breadcrumb.map((part, i) => (
+                <span key={i}>
+                  {i > 0 && <span className="text-muted-foreground/60"> &gt; </span>}
+                  <span className="text-foreground/90">{part}</span>
+                </span>
+              ))
+            ) : (
+              <span>Select a file</span>
+            )}
+          </div>
+          <div className="flex min-h-0 flex-1 overflow-auto">
+            <div
+              className="flex min-h-full w-full font-mono text-sm"
+              style={{
+                minHeight: `${Math.max(1, lines.length) * 1.5}rem`,
+                backgroundColor: EDITOR_BG,
+              }}
+            >
+              <div
+                className="shrink-0 py-2 pr-2 pl-3 text-right select-none md:pr-3 md:pl-4"
+                style={{ backgroundColor: EDITOR_BG, color: LINE_NUM }}
+                aria-hidden
+              >
+                {lines.length > 0 ? (
+                  lines.map((_, i) => (
+                    <div key={i} className="leading-6">
+                      {i + 1}
+                    </div>
+                  ))
+                ) : (
+                  <div className="leading-6">1</div>
+                )}
+              </div>
+              <div className="relative min-w-0 flex-1 overflow-auto">
+                <div
+                  className="relative w-full"
+                  style={{ minHeight: `${Math.max(1, lines.length) * 1.5}rem` }}
+                >
+                  <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+                    <SyntaxHighlighter
+                      language={getLanguageFromPath(currentFilePath)}
+                      style={dracula}
+                      customStyle={{
+                        margin: 0,
+                        ...EDITOR_PADDING,
+                        background: EDITOR_BG,
+                        fontSize: EDITOR_FONT_SIZE,
+                        lineHeight: EDITOR_LINE_HEIGHT,
+                        minHeight: "100%",
+                        fontFamily: "inherit",
+                      }}
+                      codeTagProps={{
+                        style: {
+                          fontFamily: "inherit",
+                          fontSize: EDITOR_FONT_SIZE,
+                          lineHeight: EDITOR_LINE_HEIGHT,
+                          margin: 0,
+                          padding: 0,
+                        },
+                      }}
+                      showLineNumbers={false}
+                      PreTag="div"
+                    >
+                      {code || " "}
+                    </SyntaxHighlighter>
+                  </div>
+                  <textarea
+                    className="relative block w-full min-w-0 resize-none border-0 bg-transparent font-mono placeholder:text-[#6e7681] focus:ring-0 focus:outline-none"
+                    value={code}
+                    onChange={(e) => onCodeChange(e.target.value)}
+                    spellCheck={false}
+                    placeholder={
+                      isReady
+                        ? "Select a file from the tree."
+                        : "Start the environment to load files."
+                    }
+                    aria-label="Code editor"
+                    style={{
+                      ...EDITOR_PADDING,
+                      fontSize: EDITOR_FONT_SIZE,
+                      lineHeight: EDITOR_LINE_HEIGHT,
+                      tabSize: 2,
+                      minHeight: `${Math.max(1, lines.length) * 1.5}rem`,
+                      color: "transparent",
+                      caretColor: CARET,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          {error && (
+            <div className="border-border bg-destructive/10 text-destructive shrink-0 border-t px-3 py-2 text-sm">
+              {error}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="border-border bg-muted/20 flex h-40 shrink-0 flex-col border-t md:h-[200px]">
+        <TerminalCard output={terminalOutput} />
+      </div>
+    </div>
+  );
+}
