@@ -266,11 +266,13 @@ class RunService {
   async createAgentEvent(data: CreateAgentEventDto): Promise<AgentEvent> {
     // Check if seq was explicitly provided (valid number >= 1)
     const hasExplicitSeq = typeof data.seq === 'number' && data.seq >= 1
-    // Auto-generate seq if not provided
-    let seq = hasExplicitSeq ? data.seq! : await this.getNextSeq(data.runId)
+    // Auto-generate seq if not provided - add random offset to reduce collision chance
+    let seq = hasExplicitSeq
+      ? data.seq!
+      : await this.getNextSeq(data.runId) + Math.floor(Math.random() * 100)
 
-    // Retry logic for race conditions (max 3 retries)
-    for (let attempt = 0; attempt < 3; attempt++) {
+    // Retry logic for race conditions (max 10 attempts with exponential backoff)
+    for (let attempt = 0; attempt < 10; attempt++) {
       try {
         const event = await db.agentEvent.create({
           data: {
@@ -291,7 +293,10 @@ class RunService {
       } catch (error: any) {
         // If unique constraint failed and seq was auto-generated, try next seq
         if (error.code === 'P2002' && !hasExplicitSeq) {
-          seq = await this.getNextSeq(data.runId) + attempt // Add attempt to ensure different seq
+          // Simply increment seq and retry - no need to query DB
+          seq = seq + 1 + attempt
+          // Small delay to let other concurrent requests settle
+          await new Promise(r => setTimeout(r, 10 * (attempt + 1)))
           continue
         }
         // Re-throw with clearer message
@@ -302,7 +307,7 @@ class RunService {
       }
     }
 
-    throw new Error('Failed to create event after 3 attempts')
+    throw new Error('Failed to create event after 10 attempts')
   }
 
   async deleteAgentEvent(id: string): Promise<void> {

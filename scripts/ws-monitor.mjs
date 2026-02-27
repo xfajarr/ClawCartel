@@ -2,11 +2,15 @@
 /* eslint-disable no-undef */
 import { io } from 'socket.io-client'
 
-const [, , runIdArg, serverUrlArg, fromSeqArg] = process.argv
+// Parse args, filtering out '--' and node/script paths
+const args = process.argv.slice(2).filter(arg => arg !== '--')
+
+const [runIdArg, serverUrlArg, fromSeqArg] = args
 
 if (!runIdArg) {
   console.error('Usage: node scripts/ws-monitor.mjs <runId> [serverUrl] [fromSeq]')
   console.error('Example: node scripts/ws-monitor.mjs 2f7a... http://localhost:3000 0')
+  console.error('Or: pnpm run ws:monitor <runId> [serverUrl] [fromSeq]')
   process.exit(1)
 }
 
