@@ -1,8 +1,11 @@
 "use client";
 
 import type { WebContainerStatus } from "@/app/_libs/webcontainer/core";
+import { cn } from "@/app/_libs/utils";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import dracula from "react-syntax-highlighter/dist/esm/styles/prism/dracula";
+import { FolderOpenIcon, ChevronDownIcon } from "lucide-react";
+import { useState } from "react";
 import { FileTree } from "./FileTree";
 import { TerminalCard } from "./TerminalCard";
 
@@ -58,26 +61,53 @@ export default function CodeTab({
   const isReady = status === "ready";
   const breadcrumb = currentFilePath ? currentFilePath.split("/") : [];
   const lines = code ? code.split("\n") : [];
+  const [mobileFilesOpen, setMobileFilesOpen] = useState(false);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex min-h-0 flex-1 flex-col border-t md:flex-row">
-        <div className="border-border flex min-h-[180px] shrink-0 flex-col border-b md:min-h-0 md:w-[220px] md:min-w-0 md:border-r md:border-b-0">
-          <div className="border-border h-10 border-b px-3 py-2">
+        <div
+          className={cn(
+            "border-border flex shrink-0 flex-col border-b md:min-h-0 md:w-[220px] md:min-w-0 md:border-r md:border-b-0",
+            mobileFilesOpen ? "min-h-[180px]" : "hidden min-h-0 md:flex",
+          )}
+        >
+          <div className="border-border flex h-10 shrink-0 items-center justify-between border-b px-3 py-2 md:block">
             <h2 className="text-foreground text-sm font-semibold">Files</h2>
+            <button
+              type="button"
+              onClick={() => setMobileFilesOpen(false)}
+              className="text-muted-foreground hover:bg-muted hover:text-foreground -mr-1 rounded p-1 md:hidden"
+              aria-label="Close file list"
+            >
+              <ChevronDownIcon className="size-4" />
+            </button>
           </div>
           <div className="min-h-0 flex-1 overflow-auto">
             <FileTree
               isReady={isReady}
               selectedPath={currentFilePath}
-              onSelectFile={onSelectFile}
+              onSelectFile={(path) => {
+                onSelectFile(path);
+                setMobileFilesOpen(false);
+              }}
               onTreeLoad={onTreeLoad}
             />
           </div>
         </div>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:rounded-r-lg">
-          <div className="text-muted-foreground flex h-10 shrink-0 items-center gap-1 border-b px-3 py-2 font-mono text-xs">
+          <div className="text-muted-foreground flex h-10 shrink-0 items-center gap-2 border-b px-3 py-2 font-mono text-xs">
+            {/* Mobile  */}
+            <button
+              type="button"
+              onClick={() => setMobileFilesOpen(true)}
+              className="text-foreground hover:bg-muted flex items-center gap-1 rounded px-2 py-1 md:hidden"
+              aria-label="Open file list"
+            >
+              <FolderOpenIcon className="size-3.5" />
+              <span>Files</span>
+            </button>
             {breadcrumb.length > 0 ? (
               breadcrumb.map((part, i) => (
                 <span key={i}>
@@ -86,7 +116,7 @@ export default function CodeTab({
                 </span>
               ))
             ) : (
-              <span>Select a file</span>
+              <span className={mobileFilesOpen ? "hidden md:inline" : ""}>Select a file</span>
             )}
           </div>
           <div className="flex min-h-0 flex-1 overflow-auto">

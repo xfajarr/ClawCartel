@@ -10,15 +10,13 @@ import { MessageSquareIcon, Paperclip, SendIcon } from "lucide-react";
 
 export interface ChatMessage {
   id: string;
-  /** Sender id — used with getColorById() for stable color */
   senderId: string;
   senderName?: string;
   content: string;
-  /** Optional: "user" for current user, others treated as other participants */
   role?: "user" | "assistant";
 }
 
-/** Dummy multi-person chat messages for development/demo */
+/** Dummy */
 export const DUMMY_CHAT_MESSAGES: ChatMessage[] = [
   {
     id: "1",
@@ -72,15 +70,10 @@ export const DUMMY_CHAT_MESSAGES: ChatMessage[] = [
 ];
 
 export interface ChatPanelProps {
-  /** Optional title in header */
   title?: string;
-  /** Optional placeholder when no messages */
   emptyPlaceholder?: React.ReactNode;
-  /** Optional class for the root */
   className?: string;
-  /** Initial messages to show */
   initialMessages?: ChatMessage[];
-  /** Callback when user sends a message (optional; for wiring to API later) */
   onSend?: (message: string) => void;
 }
 
@@ -170,13 +163,12 @@ export function ChatPanel({
                     id={m.senderId}
                     size={36}
                     title={m.senderName ?? m.senderId}
-                    className="shrink-0 ring-2 ring-background"
+                    className="ring-background shrink-0 ring-2"
                   />
                   <div
                     className={cn(
-                      "max-w-[85%] rounded-xl border px-3 py-2 text-sm text-foreground wrap-break-word",
-                      isUser &&
-                        "ml-auto border-[#14F195]/40 bg-[#14F195]/20",
+                      "text-foreground max-w-[85%] rounded-xl border px-3 py-2 text-sm wrap-break-word",
+                      isUser && "ml-auto border-[#14F195]/40 bg-[#14F195]/20",
                     )}
                     style={
                       isUser
@@ -188,7 +180,7 @@ export function ChatPanel({
                     }
                   >
                     {!isUser && (
-                      <div className="mb-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                      <div className="text-muted-foreground mb-0.5 font-mono text-[10px] font-medium tracking-wider uppercase">
                         {label}
                       </div>
                     )}

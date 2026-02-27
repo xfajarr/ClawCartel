@@ -3,13 +3,7 @@
 import type { WebContainer } from "@webcontainer/api";
 import { defaultProject } from "./defaultProject";
 
-export type WebContainerStatus =
-  | "idle"
-  | "booting"
-  | "installing"
-  | "starting"
-  | "ready"
-  | "error";
+export type WebContainerStatus = "idle" | "booting" | "installing" | "starting" | "ready" | "error";
 
 let instance: WebContainer | null = null;
 let previewUrl: string | null = null;
@@ -17,6 +11,8 @@ let status: WebContainerStatus = "idle";
 let statusListener: ((s: WebContainerStatus) => void) | null = null;
 let terminalOutput = "";
 let terminalListener: ((output: string) => void) | null = null;
+let pendingOnServerReady: ((url: string) => void) | null = null;
+let bootInProgress = false;
 
 function setStatus(s: WebContainerStatus) {
   status = s;
@@ -28,9 +24,7 @@ function appendTerminal(chunk: string) {
   terminalListener?.(terminalOutput);
 }
 
-async function pipeProcessOutput(
-  process: { output: ReadableStream<string> }
-): Promise<void> {
+async function pipeProcessOutput(process: { output: ReadableStream<string> }): Promise<void> {
   const reader = process.output.getReader();
   try {
     while (true) {
@@ -64,50 +58,64 @@ export function setTerminalListener(fn: ((output: string) => void) | null) {
   if (fn && terminalOutput) fn(terminalOutput);
 }
 
-/**
- * Boot WebContainer, mount default project, npm install, and start dev server.
- * Calls onServerReady(url) when the dev server is ready.
- */
 export async function init(onServerReady: (url: string) => void): Promise<void> {
-  const { WebContainer } = await import("@webcontainer/api");
-
-  setStatus("booting");
-  instance = await WebContainer.boot();
-
-  setStatus("installing");
-  await instance.mount(defaultProject);
-
-  const installProcess = await instance.spawn("npm", ["install"]);
-  void pipeProcessOutput(installProcess);
-  const installExitCode = await installProcess.exit;
-  if (installExitCode !== 0) {
-    setStatus("error");
-    throw new Error("npm install failed");
+  if (instance !== null) {
+    if (status === "ready" && previewUrl) {
+      onServerReady(previewUrl);
+    } else if (status === "booting" || status === "starting" || status === "installing") {
+      pendingOnServerReady = onServerReady;
+    }
+    return;
   }
+  if (bootInProgress) {
+    pendingOnServerReady = onServerReady;
+    return;
+  }
+  bootInProgress = true;
 
-  setStatus("starting");
-  instance.on("server-ready", (_, url) => {
-    previewUrl = url;
-    setStatus("ready");
-    onServerReady(url);
-  });
+  try {
+    const { WebContainer } = await import("@webcontainer/api");
 
-  instance.on("error", (err) => {
-    console.error("[WebContainer]", err);
-    setStatus("error");
-  });
+    setStatus("booting");
+    instance = await WebContainer.boot();
 
-  const devProcess = await instance.spawn("npm", ["run", "dev"]);
-  void pipeProcessOutput(devProcess);
+    setStatus("installing");
+    await instance.mount(defaultProject);
+
+    const installProcess = await instance.spawn("npm", ["install"]);
+    void pipeProcessOutput(installProcess);
+    const installExitCode = await installProcess.exit;
+    if (installExitCode !== 0) {
+      setStatus("error");
+      throw new Error("npm install failed");
+    }
+
+    setStatus("starting");
+    instance.on("server-ready", (_, url) => {
+      previewUrl = url;
+      setStatus("ready");
+      onServerReady(url);
+      if (pendingOnServerReady) {
+        pendingOnServerReady(url);
+        pendingOnServerReady = null;
+      }
+    });
+
+    instance.on("error", (err) => {
+      console.error("[WebContainer]", err);
+      setStatus("error");
+    });
+
+    const devProcess = await instance.spawn("npm", ["run", "dev"]);
+    void pipeProcessOutput(devProcess);
+  } catch (err) {
+    instance = null;
+    bootInProgress = false;
+    throw err;
+  }
 }
 
-/**
- * Write a file in the WebContainer filesystem. Use after init() has completed.
- */
-export async function writeFile(
-  path: string,
-  contents: string
-): Promise<void> {
+export async function writeFile(path: string, contents: string): Promise<void> {
   if (!instance) {
     throw new Error("WebContainer not booted. Call init() first.");
   }
@@ -116,10 +124,6 @@ export async function writeFile(
 
 export type DirEntry = { name: string; isDirectory: boolean };
 
-/**
- * List directory contents in the WebContainer. Use after init() has completed.
- * @param path - Directory path (e.g. '' or '.' for root, 'app' for app folder)
- */
 export async function readDir(path: string): Promise<DirEntry[]> {
   if (!instance) {
     throw new Error("WebContainer not booted. Call init() first.");
@@ -132,9 +136,6 @@ export async function readDir(path: string): Promise<DirEntry[]> {
   }));
 }
 
-/**
- * Read a file from the WebContainer. Use after init() has completed.
- */
 export async function readFile(path: string): Promise<string> {
   if (!instance) {
     throw new Error("WebContainer not booted. Call init() first.");

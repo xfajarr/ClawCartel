@@ -4,11 +4,8 @@ import * as React from "react";
 import { cn, getPixelGridById, getSolanaColorById } from "@/app/_libs/utils";
 
 export interface PixelAvatarProps {
-  /** Stable id (e.g. user id, wallet address) — same id = same avatar */
   id: string;
-  /** Total size in pixels (default 36) */
   size?: number;
-  /** Optional title/tooltip */
   title?: string;
   className?: string;
 }
@@ -24,7 +21,10 @@ export function PixelAvatar({ id, size = 36, title, className }: PixelAvatarProp
 
   return (
     <div
-      className={cn("inline-flex shrink-0 overflow-hidden rounded-full ring-2 ring-background", className)}
+      className={cn(
+        "ring-background inline-flex shrink-0 overflow-hidden rounded-full ring-2",
+        className,
+      )}
       style={{ width: size, height: size, imageRendering: "pixelated" }}
       title={title}
     >
