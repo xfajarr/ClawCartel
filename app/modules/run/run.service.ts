@@ -219,7 +219,7 @@ class RunService {
     const where: any = {}
     if (query.runId) where.runId = query.runId
     if (query.agentRunId) where.agentRunId = query.agentRunId
-    if (query.eventType) where.eventType = query.eventType
+    if (query.eventType) where.eventType = this.toPrismaEventType(query.eventType)
 
     const [data, total] = await Promise.all([
       db.agentEvent.findMany({
@@ -258,23 +258,51 @@ class RunService {
     return event as unknown as AgentEvent | null
   }
 
-  async createAgentEvent(data: CreateAgentEventDto): Promise<AgentEvent> {
-    const event = await db.agentEvent.create({
-      data: {
-        runId: data.runId,
-        agentRunId: data.agentRunId,
-        seq: BigInt(data.seq),
-        eventType: data.eventType as any,
-        payload: data.payload,
-      },
-      include: {
-        agentRun: {
-          select: { role: true, agentId: true },
-        },
-      },
-    })
+  // Convert dot notation to underscore for Prisma enum
+  private toPrismaEventType(eventType: string): string {
+    return eventType.replace(/\./g, '_')
+  }
 
-    return event as unknown as AgentEvent
+  async createAgentEvent(data: CreateAgentEventDto): Promise<AgentEvent> {
+    // Check if seq was explicitly provided (valid number >= 1)
+    const hasExplicitSeq = typeof data.seq === 'number' && data.seq >= 1
+    // Auto-generate seq if not provided
+    let seq = hasExplicitSeq ? data.seq! : await this.getNextSeq(data.runId)
+
+    // Retry logic for race conditions (max 3 retries)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const event = await db.agentEvent.create({
+          data: {
+            runId: data.runId,
+            agentRunId: data.agentRunId,
+            seq: BigInt(seq),
+            eventType: this.toPrismaEventType(data.eventType) as any,
+            payload: data.payload,
+          },
+          include: {
+            agentRun: {
+              select: { role: true, agentId: true },
+            },
+          },
+        })
+
+        return event as unknown as AgentEvent
+      } catch (error: any) {
+        // If unique constraint failed and seq was auto-generated, try next seq
+        if (error.code === 'P2002' && !hasExplicitSeq) {
+          seq = await this.getNextSeq(data.runId) + attempt // Add attempt to ensure different seq
+          continue
+        }
+        // Re-throw with clearer message
+        if (error.code === 'P2002') {
+          throw new Error(`Event with sequence ${seq} already exists for this run`)
+        }
+        throw error
+      }
+    }
+
+    throw new Error('Failed to create event after 3 attempts')
   }
 
   async deleteAgentEvent(id: string): Promise<void> {
@@ -294,7 +322,7 @@ class RunService {
       if (query.toSeq !== undefined) where.seq.lte = BigInt(query.toSeq)
     }
 
-    if (query.eventType) where.eventType = query.eventType
+    if (query.eventType) where.eventType = this.toPrismaEventType(query.eventType)
 
     const events = await db.agentEvent.findMany({
       where,
