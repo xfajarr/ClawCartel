@@ -64,7 +64,7 @@ export interface CreateAgentRunDto {
 export interface CreateAgentEventDto {
   runId: string
   agentRunId: string
-  seq: number
+  seq?: number
   eventType: EventType
   payload: Record<string, unknown>
 }

@@ -48,12 +48,9 @@ async function appendAndBroadcast(
   eventType: EventType,
   payload: Record<string, unknown>
 ): Promise<StreamEvent> {
-  const seq = await runService.getNextSeq(runId)
-
   const event = await runService.createAgentEvent({
     runId,
     agentRunId: agentRun.id,
-    seq,
     eventType,
     payload,
   })
@@ -62,7 +59,7 @@ async function appendAndBroadcast(
     runId,
     agentRunId: agentRun.id,
     role,
-    seq,
+    seq: Number(event.seq),
     eventType,
     payload,
     createdAt: event.createdAt,
