@@ -1,0 +1,93 @@
+/* Override @solana/wallet-adapter-react-ui modal to match app theme (same as our Dialog) */
+
+.wallet-adapter-modal {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.wallet-adapter-modal-overlay {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.wallet-adapter-modal-wrapper {
+  max-width: 400px;
+  border-radius: 0.75rem;
+  background: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  font-family: var(--font-dmSans), system-ui, sans-serif;
+}
+
+.wallet-adapter-modal-title {
+  font-weight: 600;
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  padding: 1.5rem 1.5rem 1rem;
+  text-align: center;
+  color: var(--foreground);
+}
+
+.wallet-adapter-modal-button-close {
+  top: 1rem;
+  right: 1rem;
+  padding: 0.5rem;
+  background: var(--muted);
+  border-radius: 0.5rem;
+}
+
+.wallet-adapter-modal-button-close:hover {
+  background: var(--accent);
+}
+
+.wallet-adapter-modal-button-close svg {
+  fill: var(--muted-foreground);
+}
+
+.wallet-adapter-modal-button-close:hover svg {
+  fill: var(--foreground);
+}
+
+.wallet-adapter-modal-middle {
+  padding: 0 1.5rem 1.5rem;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button {
+  color: var(--foreground);
+  font-weight: 500;
+  border-radius: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button:hover {
+  background: var(--muted);
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button span {
+  color: var(--muted-foreground);
+  opacity: 1;
+}
+
+.wallet-adapter-modal-list-more {
+  color: var(--muted-foreground);
+}
+
+.wallet-adapter-modal-list-more:hover {
+  color: var(--foreground);
+}
+
+.wallet-adapter-modal-list-more svg {
+  fill: currentColor;
+}
+
+.wallet-adapter-modal-middle-button {
+  margin-top: 1rem;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+}
+
+.wallet-adapter-modal-middle-button:hover {
+  opacity: 0.9;
+}

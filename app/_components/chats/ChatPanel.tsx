@@ -5,8 +5,9 @@ import { PixelAvatar } from "@/app/_components/PixelAvatar";
 import { Button } from "@/app/_components/ui/button";
 import { ScrollArea } from "@/app/_components/ui/scroll-area";
 import { Textarea } from "@/app/_components/ui/textarea";
+import { useSolana } from "@/app/_providers/SolanaProvider";
 import { cn, getSolanaColorById, truncateId } from "@/app/_libs/utils";
-import { MessageSquareIcon, Paperclip, SendIcon } from "lucide-react";
+import { MessageSquareIcon, Paperclip, SendIcon, WalletIcon } from "lucide-react";
 
 export interface ChatMessage {
   id: string;
@@ -78,17 +79,18 @@ export interface ChatPanelProps {
 }
 
 export function ChatPanel({
-  title = "Chat",
   emptyPlaceholder,
   className,
   initialMessages = [],
   onSend,
 }: ChatPanelProps) {
+  const { isConnected, setOpen: setWalletOpen } = useSolana();
   const [messages, setMessages] = React.useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = React.useState("");
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
   const handleSend = () => {
+    if (!isConnected) return;
     const text = input.trim();
     if (!text) return;
     setInput("");
@@ -120,6 +122,7 @@ export function ChatPanel({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!isConnected) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -128,14 +131,6 @@ export function ChatPanel({
 
   return (
     <div className={cn("bg-background flex h-full flex-col", className)}>
-      {/* Header */}
-      <div className="border-border/50 flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <MessageSquareIcon className="text-muted-foreground size-4 shrink-0" />
-          <span className="truncate text-sm font-medium">{title}</span>
-        </div>
-      </div>
-
       {/* Messages */}
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-3 p-3">
@@ -196,36 +191,47 @@ export function ChatPanel({
 
       {/* Input */}
       <div className="border-border/50 shrink-0 border-t p-2">
-        <div className="relative flex gap-2">
-          <Button
-            type="button"
-            size="icon"
-            className="absolute top-3 right-3 size-9 shrink-0"
-            onClick={handleSend}
-            aria-label="Send"
-          >
-            <SendIcon className="size-4" />
-          </Button>
+        {!isConnected ? (
+          <div className="text-muted-foreground flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed py-6 text-center text-sm">
+            <WalletIcon className="size-8 opacity-50" />
+            <p>Connect your wallet to chat</p>
+            <Button variant="secondary" size="sm" onClick={() => setWalletOpen(true)}>
+              <WalletIcon className="mr-2 size-4" />
+              Connect Wallet
+            </Button>
+          </div>
+        ) : (
+          <div className="relative flex gap-2">
+            <Button
+              type="button"
+              size="icon"
+              className="absolute top-3 right-3 size-9 shrink-0"
+              onClick={handleSend}
+              aria-label="Send"
+            >
+              <SendIcon className="size-4" />
+            </Button>
 
-          <Button
-            type="button"
-            size="icon"
-            className="absolute bottom-3 left-3 size-9 shrink-0"
-            onClick={handleFileUpload}
-            aria-label="Upload file"
-          >
-            <Paperclip className="size-4" />
-          </Button>
+            <Button
+              type="button"
+              size="icon"
+              className="absolute bottom-3 left-3 size-9 shrink-0"
+              onClick={handleFileUpload}
+              aria-label="Upload file"
+            >
+              <Paperclip className="size-4" />
+            </Button>
 
-          <Textarea
-            placeholder="Message…"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            rows={1}
-            className="min-h-40 resize-none py-2 text-sm"
-          />
-        </div>
+            <Textarea
+              placeholder="Message…"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              rows={1}
+              className="min-h-40 resize-none py-2 text-sm"
+            />
+          </div>
+        )}
       </div>
     </div>
   );

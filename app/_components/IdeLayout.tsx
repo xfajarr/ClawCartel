@@ -269,16 +269,14 @@ export function IdeLayout({
                       )}
                       style={{ width: rightWidth }}
                     >
-                      <div className="border-border/50 flex shrink-0 items-center justify-end border-b px-1 py-1">
-                        <button
-                          type="button"
-                          onClick={() => setRightWidth(0)}
-                          className="text-muted-foreground hover:bg-muted hover:text-foreground rounded p-1.5"
-                          aria-label="Hide right panel"
-                        >
-                          <PanelRightCloseIcon className="size-4" />
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setRightWidth(0)}
+                        className="text-muted-foreground hover:bg-muted hover:text-foreground absolute top-2 right-2 z-10 rounded p-1.5"
+                        aria-label="Hide right panel"
+                      >
+                        <PanelRightCloseIcon className="size-4" />
+                      </button>
                       <div className="min-h-0 flex-1 overflow-auto">{right}</div>
                     </div>
                   </>
