@@ -1,119 +1,154 @@
-import { randomUUID } from 'node:crypto'
 import { FastifyInstance } from 'fastify'
+import runService from '#app/modules/run/run.service'
+import { AgentRole, StartRunBody, StreamEvent } from '#app/modules/agent/agent.interface'
 import {
-  AgentEvent,
-  AgentRole,
   AgentRun,
-  StartRunBody,
-} from '#app/modules/agent/agent.interface'
+  EventType,
+  InputType,
+  Run,
+} from '#app/modules/run/run.interface'
 
-const RUNS = new Map<string, AgentRun>()
-const EVENTS = new Map<string, AgentEvent[]>()
-
-const ROLES: AgentRole[] = ['pm', 'fe', 'be_sc', 'researcher', 'marketing']
-
-function pushEvent(app: FastifyInstance, event: AgentEvent) {
-  const list = EVENTS.get(event.runId) ?? []
-  list.push(event)
-  EVENTS.set(event.runId, list)
-
-  app.io.to(`run:${event.runId}`).emit('agent_event', event)
+const ROLE_AGENT_MAP: Record<AgentRole, string> = {
+  pm: 'pm-agent',
+  fe: 'fe-agent',
+  'be_sc': 'be-sc-agent',
+  marketing: 'marketing-agent',
 }
 
-function roleText(role: AgentRole) {
-  switch (role) {
-  case 'pm':
-    return 'Breaking down scope and creating task plan'
-  case 'fe':
-    return 'Drafting frontend flow and UI implementation notes'
-  case 'be_sc':
-    return 'Designing backend endpoints and Solana devnet execution plan'
-  case 'researcher':
-    return 'Collecting references and validating assumptions'
-  case 'marketing':
-    return 'Preparing launch narrative and campaign draft'
-  default:
-    return 'Working on assigned task'
+const ROLES: AgentRole[] = ['pm', 'fe', 'be_sc', 'marketing']
+
+const ROLE_LOGS: Record<AgentRole, string[]> = {
+  pm: [
+    'PM: Breaking down the project scope and constraints',
+    'PM: Assigning FE, BE+SC, and Marketing workstreams',
+    'PM: Consolidating outputs into one execution plan',
+  ],
+  fe: [
+    'FE: Defining mobile flow for chat/PRD input and run timeline',
+    'FE: Mapping websocket event rendering for agent bubbles',
+    'FE: Preparing reconnect + replay behavior using seq cursor',
+  ],
+  'be_sc': [
+    'BE+SC: Designing run/event persistence schema and indexing',
+    'BE+SC: Preparing Solana Devnet execution integration points',
+    'BE+SC: Finalizing API contract for run start and status tracking',
+  ],
+  marketing: [
+    'Marketing: Drafting ClawCartel narrative for hackathon judges',
+    'Marketing: Preparing launch message based on agent output timeline',
+    'Marketing: Proposing concise product positioning and CTA',
+  ],
+}
+
+async function appendAndBroadcast(
+  app: FastifyInstance,
+  runId: string,
+  agentRun: AgentRun,
+  role: AgentRole,
+  eventType: EventType,
+  payload: Record<string, unknown>
+): Promise<StreamEvent> {
+  const seq = await runService.getNextSeq(runId)
+
+  const event = await runService.createAgentEvent({
+    runId,
+    agentRunId: agentRun.id,
+    seq,
+    eventType,
+    payload,
+  })
+
+  const streamEvent: StreamEvent = {
+    runId,
+    agentRunId: agentRun.id,
+    role,
+    seq,
+    eventType,
+    payload,
+    createdAt: event.createdAt,
   }
+
+  app.io.to(`run:${runId}`).emit('agent_event', streamEvent)
+
+  return streamEvent
 }
 
 const AgentService = {
-  startRun: (app: FastifyInstance, body: StartRunBody) => {
-    const id = randomUUID()
-    const now = new Date().toISOString()
-    const source = body.source ?? (body.prdText ? 'prd' : 'chat')
-    const input = body.prdText ?? body.idea ?? ''
+  startRun: async (app: FastifyInstance, body: StartRunBody): Promise<Run> => {
+    const inputText = body.prdText?.trim() || body.idea?.trim() || ''
+    const inputType: InputType = body.source ?? (body.prdText ? 'prd' : 'chat')
 
-    const run: AgentRun = {
-      id,
-      status: 'running',
-      source,
-      input,
-      createdAt: now,
-      updatedAt: now,
-    }
+    const run = await runService.createRun({
+      inputType,
+      inputText,
+      status: 'planning',
+    })
 
-    RUNS.set(id, run)
-    EVENTS.set(id, [])
-
-    // Simulate parallel agent workers for FE testing.
-    for (const role of ROLES) {
-      setTimeout(() => {
-        const startedAt = new Date().toISOString()
-        pushEvent(app, {
-          id: randomUUID(),
-          runId: id,
+    const agentRuns = await Promise.all(
+      ROLES.map(role =>
+        runService.createAgentRun({
+          runId: run.id,
           role,
-          type: 'agent.started',
-          text: `${role} started`,
-          createdAt: startedAt,
+          agentId: ROLE_AGENT_MAP[role],
+          status: 'queued',
+        })
+      )
+    )
+
+    await Promise.all(
+      agentRuns.map(async agentRun => {
+        const role = agentRun.role as AgentRole
+
+        await runService.updateAgentRun(agentRun.id, {
+          status: 'running',
+          startedAt: new Date(),
         })
 
-        pushEvent(app, {
-          id: randomUUID(),
-          runId: id,
-          role,
-          type: 'agent.delta',
-          text: roleText(role),
-          createdAt: new Date().toISOString(),
+        await appendAndBroadcast(app, run.id, agentRun, role, 'agent.started', {
+          message: `${role} started`,
+          source: 'backend-simulated',
         })
 
-        pushEvent(app, {
-          id: randomUUID(),
-          runId: id,
-          role,
-          type: 'agent.done',
-          text: `${role} completed`,
-          createdAt: new Date().toISOString(),
-        })
-
-        const current = RUNS.get(id)
-        if (!current) return
-
-        const doneCount = (EVENTS.get(id) ?? []).filter(e => e.type === 'agent.done').length
-        if (doneCount === ROLES.length) {
-          current.status = 'completed'
-          current.updatedAt = new Date().toISOString()
-          RUNS.set(id, current)
-
-          pushEvent(app, {
-            id: randomUUID(),
-            runId: id,
-            role: 'pm',
-            type: 'run.done',
-            text: 'Run completed',
-            createdAt: new Date().toISOString(),
+        for (const line of ROLE_LOGS[role]) {
+          await appendAndBroadcast(app, run.id, agentRun, role, 'agent.delta', {
+            message: line,
+            source: 'backend-simulated',
           })
         }
-      }, Math.floor(Math.random() * 700) + 300)
+
+        await appendAndBroadcast(app, run.id, agentRun, role, 'agent.done', {
+          message: `${role} completed`,
+          source: 'backend-simulated',
+        })
+
+        await runService.updateAgentRun(agentRun.id, {
+          status: 'completed',
+          endedAt: new Date(),
+        })
+      })
+    )
+
+    await runService.updateRun(run.id, { status: 'completed' })
+
+    const pmAgentRun = agentRuns.find(a => a.role === 'pm') ?? agentRuns[0]
+    if (pmAgentRun) {
+      await appendAndBroadcast(app, run.id, pmAgentRun, 'pm', 'run.done', {
+        message: 'Run completed',
+        source: 'backend-simulated',
+      })
     }
 
-    return run
+    const latestRun = await runService.getRun(run.id)
+
+    return latestRun ?? run
   },
 
-  getRun: (runId: string) => RUNS.get(runId) ?? null,
+  getRun: (runId: string) => runService.getRunWithAgentRuns(runId),
 
-  getEvents: (runId: string) => EVENTS.get(runId) ?? [],
+  getEvents: (runId: string, fromSeq?: number) =>
+    runService.replayEvents(runId, {
+      fromSeq,
+    }),
 }
 
 export default AgentService

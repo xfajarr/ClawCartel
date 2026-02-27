@@ -22,7 +22,12 @@ export default function (
 
   app.get<{ Params: RunParams }>(
     '/runs/:runId/events',
-    { schema: AgentSchema.runParams },
+    {
+      schema: {
+        ...AgentSchema.runParams,
+        ...AgentSchema.eventsQuery,
+      },
+    },
     AgentController.getEvents
   )
 
