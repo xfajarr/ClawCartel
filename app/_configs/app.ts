@@ -4,4 +4,5 @@ export const APP_CONFIG = {
   environment: (process.env.NEXT_PUBLIC_ENVIRONMENT ?? "devnet") as "mainnet" | "devnet",
   solana_rpc_endpoint:
     process.env.NEXT_PUBLIC_SOLANA_RPC_ENDPOINT ?? "https://api.devnet.solana.com",
+  socket_url: process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:3000",
 };
