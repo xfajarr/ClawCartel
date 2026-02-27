@@ -1,5 +1,13 @@
 import 'fastify'
+import '@fastify/jwt'
 import type { Server as SocketIOServer } from 'socket.io'
+
+export interface JwtPayload {
+  sub: number // user id
+  wallet: string // solana wallet address
+  iat?: number
+  exp?: number
+}
 
 declare module 'fastify' {
   interface FastifyReply {
@@ -8,5 +16,16 @@ declare module 'fastify' {
 
   interface FastifyInstance {
     io: SocketIOServer
+  }
+
+  interface FastifyRequest {
+    user: JwtPayload
+  }
+}
+
+declare module '@fastify/jwt' {
+  interface FastifyJWT {
+    payload: JwtPayload
+    user: JwtPayload
   }
 }
