@@ -24,6 +24,9 @@ const ROLES: AgentRole[] = ['pm', 'fe', 'be_sc', 'marketing']
 const OPENCLAW_BIN = process.env.OPENCLAW_BIN ?? 'openclaw'
 const OPENCLAW_TIMEOUT_SECONDS = parseInt(process.env.OPENCLAW_AGENT_TIMEOUT_SECONDS ?? '120')
 const OPENCLAW_ENABLED = (process.env.OPENCLAW_AGENT_ENABLED ?? 'true') === 'true'
+const OPENCLAW_GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL
+const OPENCLAW_GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN
+const OPENCLAW_GATEWAY_PASSWORD = process.env.OPENCLAW_GATEWAY_PASSWORD
 
 const ROLE_SYSTEM_PROMPT: Record<AgentRole, string> = {
   pm: 'You are PM agent. Break down scope, define tasks, dependencies, and final summary.',
@@ -63,6 +66,23 @@ function buildRolePrompt(role: AgentRole, inputText: string): string {
     'Respond with concise actionable output in plain text.',
     'Keep it under 8 bullet points and include concrete next actions.',
   ].join('\n')
+}
+
+async function checkGatewayConnectivity(): Promise<void> {
+  if (!OPENCLAW_ENABLED) return
+
+  const args = ['health', '--json']
+
+  await execFileAsync(OPENCLAW_BIN, args, {
+    maxBuffer: 2 * 1024 * 1024,
+    timeout: 15_000,
+    env: {
+      ...process.env,
+      ...(OPENCLAW_GATEWAY_URL ? { OPENCLAW_GATEWAY_URL } : {}),
+      ...(OPENCLAW_GATEWAY_TOKEN ? { OPENCLAW_GATEWAY_TOKEN } : {}),
+      ...(OPENCLAW_GATEWAY_PASSWORD ? { OPENCLAW_GATEWAY_PASSWORD } : {}),
+    },
+  })
 }
 
 function chunkText(text: string): string[] {
@@ -110,6 +130,12 @@ async function runOpenClawAgent(role: AgentRole, inputText: string): Promise<{
 
   const { stdout } = await execFileAsync(OPENCLAW_BIN, args, {
     maxBuffer: 8 * 1024 * 1024,
+    env: {
+      ...process.env,
+      ...(OPENCLAW_GATEWAY_URL ? { OPENCLAW_GATEWAY_URL } : {}),
+      ...(OPENCLAW_GATEWAY_TOKEN ? { OPENCLAW_GATEWAY_TOKEN } : {}),
+      ...(OPENCLAW_GATEWAY_PASSWORD ? { OPENCLAW_GATEWAY_PASSWORD } : {}),
+    },
   })
 
   const parsed = JSON.parse(stdout)
@@ -252,6 +278,14 @@ const AgentService = {
       inputText,
       status: 'planning',
     })
+
+    try {
+      await checkGatewayConnectivity()
+    } catch (error) {
+      await runService.updateRun(run.id, { status: 'failed' })
+      const message = error instanceof Error ? error.message : 'Gateway connectivity check failed'
+      throw new Error(`OpenClaw gateway unreachable: ${message}`)
+    }
 
     const agentRuns = await Promise.all(
       ROLES.map(role =>
