@@ -21,6 +21,7 @@
     "#prisma/*": "./prisma/*.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.999.0",
     "@fastify/cors": "^10.1.0",
     "@fastify/helmet": "^13.0.2",
     "@fastify/multipart": "^9.4.0",

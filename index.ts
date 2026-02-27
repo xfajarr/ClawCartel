@@ -1,3 +1,4 @@
+import '#app/config/env'
 import Fastify from 'fastify'
 import routes from '#app/routes/index'
 import AppConfig from '#app/config/app'
