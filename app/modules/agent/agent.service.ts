@@ -28,6 +28,10 @@ const OPENCLAW_GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL
 const OPENCLAW_GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN
 const OPENCLAW_GATEWAY_PASSWORD = process.env.OPENCLAW_GATEWAY_PASSWORD
 
+// Preferred for local backend: call a remote MonkClaw bridge endpoint over HTTPS
+const OPENCLAW_BRIDGE_URL = process.env.OPENCLAW_BRIDGE_URL
+const OPENCLAW_BRIDGE_TOKEN = process.env.OPENCLAW_BRIDGE_TOKEN
+
 const ROLE_SYSTEM_PROMPT: Record<AgentRole, string> = {
   pm: 'You are PM agent. Break down scope, define tasks, dependencies, and final summary.',
   fe: 'You are FE agent. Focus on frontend architecture, websocket rendering, and UX states.',
@@ -70,6 +74,20 @@ function buildRolePrompt(role: AgentRole, inputText: string): string {
 
 async function checkGatewayConnectivity(): Promise<void> {
   if (!OPENCLAW_ENABLED) return
+
+  if (OPENCLAW_BRIDGE_URL) {
+    const res = await fetch(`${OPENCLAW_BRIDGE_URL.replace(/\/$/, '')}/health`, {
+      headers: {
+        ...(OPENCLAW_BRIDGE_TOKEN ? { Authorization: `Bearer ${OPENCLAW_BRIDGE_TOKEN}` } : {}),
+      },
+    })
+
+    if (!res.ok) {
+      throw new Error(`Bridge health check failed: ${res.status} ${res.statusText}`)
+    }
+
+    return
+  }
 
   const args = ['health', '--json']
 
@@ -114,6 +132,42 @@ async function runOpenClawAgent(role: AgentRole, inputText: string): Promise<{
 }> {
   const agentId = ROLE_AGENT_MAP[role]
   const prompt = buildRolePrompt(role, inputText)
+
+  if (OPENCLAW_BRIDGE_URL) {
+    const res = await fetch(`${OPENCLAW_BRIDGE_URL.replace(/\/$/, '')}/api/agent/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(OPENCLAW_BRIDGE_TOKEN ? { Authorization: `Bearer ${OPENCLAW_BRIDGE_TOKEN}` } : {}),
+      },
+      body: JSON.stringify({
+        agentId,
+        role,
+        message: prompt,
+        timeoutSeconds: OPENCLAW_TIMEOUT_SECONDS,
+      }),
+    })
+
+    if (!res.ok) {
+      throw new Error(`Bridge agent call failed: ${res.status} ${res.statusText}`)
+    }
+
+    const parsed = await res.json() as {
+      text?: string
+      meta?: {
+        model?: string
+        provider?: string
+        sessionId?: string
+        usage?: Record<string, unknown>
+        runId?: string
+      }
+    }
+
+    return {
+      text: parsed?.text?.trim() || 'No response text from bridge agent.',
+      meta: parsed?.meta ?? {},
+    }
+  }
 
   const args = [
     'agent',
@@ -200,9 +254,13 @@ async function executeRole(
     startedAt: new Date(),
   })
 
+  const runtimeSource = OPENCLAW_ENABLED
+    ? (OPENCLAW_BRIDGE_URL ? 'bridge' : 'openclaw')
+    : 'fallback'
+
   await appendAndBroadcast(app, run.id, agentRun, role, 'agent.started', {
     message: `${role} started`,
-    source: OPENCLAW_ENABLED ? 'openclaw' : 'fallback',
+    source: runtimeSource,
     agentId: ROLE_AGENT_MAP[role],
   })
 
@@ -211,8 +269,8 @@ async function executeRole(
 
     if (OPENCLAW_ENABLED) {
       await appendAndBroadcast(app, run.id, agentRun, role, 'agent.delta', {
-        message: `${role}: contacting OpenClaw agent...`,
-        source: 'openclaw',
+        message: `${role}: contacting ${OPENCLAW_BRIDGE_URL ? 'bridge endpoint' : 'OpenClaw agent'}...`,
+        source: runtimeSource,
       })
 
       const result = await runOpenClawAgent(role, inputText)
@@ -222,14 +280,14 @@ async function executeRole(
       if (chunks.length === 0) {
         await appendAndBroadcast(app, run.id, agentRun, role, 'agent.delta', {
           message: `${role}: no content returned`,
-          source: 'openclaw',
+          source: runtimeSource,
           agentMeta: result.meta,
         })
       } else {
         for (const chunk of chunks) {
           await appendAndBroadcast(app, run.id, agentRun, role, 'agent.delta', {
             message: chunk,
-            source: 'openclaw',
+            source: runtimeSource,
             agentMeta: result.meta,
           })
         }
@@ -245,7 +303,7 @@ async function executeRole(
 
     await appendAndBroadcast(app, run.id, agentRun, role, 'agent.done', {
       message: `${role} completed`,
-      source: OPENCLAW_ENABLED ? 'openclaw' : 'fallback',
+      source: runtimeSource,
       ...(latestAgentMeta ? { agentMeta: latestAgentMeta } : {}),
     })
 
@@ -258,7 +316,7 @@ async function executeRole(
 
     await appendAndBroadcast(app, run.id, agentRun, role, 'agent.error', {
       message,
-      source: OPENCLAW_ENABLED ? 'openclaw' : 'fallback',
+      source: runtimeSource,
     })
 
     await runService.updateAgentRun(agentRun.id, {
@@ -319,7 +377,7 @@ const AgentService = {
     if (pmAgentRun) {
       await appendAndBroadcast(app, run.id, pmAgentRun, 'pm', 'run.done', {
         message: hasFailure ? 'Run completed with errors' : 'Run completed',
-        source: OPENCLAW_ENABLED ? 'openclaw' : 'fallback',
+        source: OPENCLAW_ENABLED ? (OPENCLAW_BRIDGE_URL ? 'bridge' : 'openclaw') : 'fallback',
       })
     }
 
