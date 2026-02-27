@@ -9,7 +9,7 @@ export default function IdeLayoutPage() {
   return (
     <div className="bg-background h-screen w-screen">
       <IdeLayout
-        defaultLeftSize={28}
+        defaultLeftSize={380}
         defaultRightWidth={300}
         left={
           <ChatPanel

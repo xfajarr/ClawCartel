@@ -1,27 +1,30 @@
 "use client";
 
 import * as React from "react";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/app/_components/ui/resizable";
 import { cn } from "@/app/_libs/utils";
-import { PanelRightCloseIcon, PanelRightIcon } from "lucide-react";
+import {
+  PanelLeftCloseIcon,
+  PanelLeftIcon,
+  PanelRightCloseIcon,
+  PanelRightIcon,
+} from "lucide-react";
 
+const DEFAULT_LEFT_WIDTH = 380;
+const MIN_LEFT_WIDTH = 0;
+const MAX_LEFT_WIDTH = 600;
 const DEFAULT_RIGHT_WIDTH = 280;
 const MIN_RIGHT_WIDTH = 0;
-const MAX_RIGHT_WIDTH = 600;
+const MAX_RIGHT_WIDTH = 2000;
 
 export interface IdeLayoutProps {
   /** Left sidebar content */
   left?: React.ReactNode;
   /** Main center content */
   children: React.ReactNode;
-  /** Right sidebar content — overlays on top of center so center is never cut */
+  /** Right sidebar content — overlays on top of center */
   right?: React.ReactNode;
-  /** Default size of left panel (e.g. 20 or "20%") */
-  defaultLeftSize?: number | string;
+  /** Default width in px of left panel */
+  defaultLeftSize?: number;
   /** Default width in px of right overlay panel */
   defaultRightWidth?: number;
   /** Optional class for the root container */
@@ -36,7 +39,7 @@ export function IdeLayout({
   left,
   children,
   right,
-  defaultLeftSize = 20,
+  defaultLeftSize = DEFAULT_LEFT_WIDTH,
   defaultRightWidth = DEFAULT_RIGHT_WIDTH,
   className,
   leftClassName,
@@ -46,110 +49,156 @@ export function IdeLayout({
   const hasLeft = left != null;
   const hasRight = right != null;
 
-  const leftSize = hasLeft ? defaultLeftSize : 0;
+  const [leftWidth, setLeftWidth] = React.useState(defaultLeftSize);
   const [rightWidth, setRightWidth] = React.useState(defaultRightWidth);
+  const leftDragRef = React.useRef(false);
   const rightDragRef = React.useRef(false);
-  const startXRef = React.useRef(0);
-  const startWidthRef = React.useRef(0);
+  const leftStartRef = React.useRef({ x: 0, w: 0 });
+  const rightStartRef = React.useRef({ x: 0, w: 0 });
 
-  const handleRightDragStart = React.useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    rightDragRef.current = true;
-    startXRef.current = e.clientX;
-    startWidthRef.current = rightWidth;
-  }, [rightWidth]);
+  const handleLeftDragStart = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      leftDragRef.current = true;
+      leftStartRef.current = { x: e.clientX, w: leftWidth };
+    },
+    [leftWidth],
+  );
+
+  const handleRightDragStart = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      rightDragRef.current = true;
+      rightStartRef.current = { x: e.clientX, w: rightWidth };
+    },
+    [rightWidth],
+  );
 
   React.useEffect(() => {
-    if (!hasRight) return;
     const onMove = (e: MouseEvent) => {
-      if (!rightDragRef.current) return;
-      const delta = startXRef.current - e.clientX;
-      const next = Math.min(MAX_RIGHT_WIDTH, Math.max(MIN_RIGHT_WIDTH, startWidthRef.current + delta));
-      setRightWidth(next);
-      startWidthRef.current = next;
-      startXRef.current = e.clientX;
+      if (leftDragRef.current) {
+        const delta = e.clientX - leftStartRef.current.x;
+        const next = Math.min(
+          MAX_LEFT_WIDTH,
+          Math.max(MIN_LEFT_WIDTH, leftStartRef.current.w + delta),
+        );
+        setLeftWidth(next);
+        leftStartRef.current = { x: e.clientX, w: next };
+      }
+      if (rightDragRef.current) {
+        const delta = rightStartRef.current.x - e.clientX;
+        const next = Math.min(
+          MAX_RIGHT_WIDTH,
+          Math.max(MIN_RIGHT_WIDTH, rightStartRef.current.w + delta),
+        );
+        setRightWidth(next);
+        rightStartRef.current = { x: e.clientX, w: next };
+      }
     };
-    const onUp = () => { rightDragRef.current = false; };
+    const onUp = () => {
+      leftDragRef.current = false;
+      rightDragRef.current = false;
+    };
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
     return () => {
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
     };
-  }, [hasRight]);
+  }, []);
 
   return (
-    <div className={cn("h-full w-full", className)}>
-      <ResizablePanelGroup
-        orientation="horizontal"
-        className={cn("h-full w-full", !className?.includes("rounded") && "rounded-lg border")}
-      >
-        {hasLeft && (
+    <div className={cn("flex h-full w-full", className)}>
+      {/* Left panel — can be fully hidden like right */}
+      {hasLeft &&
+        (leftWidth > 0 ? (
           <>
-            <ResizablePanel defaultSize={typeof leftSize === "string" ? leftSize : `${leftSize}%`}>
-              <div className={cn("flex h-full flex-col overflow-hidden", leftClassName)}>
-                {left}
-              </div>
-            </ResizablePanel>
-            <ResizableHandle withHandle />
+            <div
+              className={cn(
+                "border-border bg-background relative flex shrink-0 flex-col overflow-hidden border-r",
+                leftClassName,
+              )}
+              style={{ width: leftWidth }}
+            >
+              <button
+                type="button"
+                onClick={() => setLeftWidth(0)}
+                className="text-muted-foreground hover:bg-muted hover:text-foreground absolute top-2 right-2 z-10 rounded p-1.5"
+                aria-label="Hide left panel"
+              >
+                <PanelLeftCloseIcon className="size-4" />
+              </button>
+              <div className="min-h-0 flex-1 overflow-hidden">{left}</div>
+            </div>
+            <div
+              role="separator"
+              aria-label="Resize left panel"
+              onMouseDown={handleLeftDragStart}
+              className="hover:bg-primary/30 active:bg-primary/50 w-1 shrink-0 cursor-col-resize"
+            />
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setLeftWidth(defaultLeftSize)}
+            className="border-border/50 bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground z-10 flex w-6 shrink-0 flex-col items-center justify-center gap-1 border-r transition-colors"
+            aria-label="Show left panel"
+          >
+            <PanelLeftIcon className="size-4" />
+          </button>
+        ))}
+
+      {/* Center + right overlay */}
+      <div className="relative min-w-0 flex-1">
+        <div className={cn("flex h-full w-full flex-col overflow-auto", centerClassName)}>
+          {children}
+        </div>
+
+        {hasRight && (
+          <>
+            {rightWidth > 0 ? (
+              <>
+                <div
+                  role="separator"
+                  aria-orientation="vertical"
+                  onMouseDown={handleRightDragStart}
+                  className="hover:bg-primary/30 active:bg-primary/50 absolute top-0 bottom-0 z-20 w-1 cursor-col-resize"
+                  style={{ right: rightWidth }}
+                  aria-label="Resize right panel"
+                />
+                <div
+                  className={cn(
+                    "border-border bg-background absolute top-0 right-0 bottom-0 z-10 flex flex-col overflow-hidden border-l shadow-lg",
+                    rightClassName,
+                  )}
+                  style={{ width: rightWidth }}
+                >
+                  <div className="border-border/50 flex shrink-0 items-center justify-end border-b px-1 py-1">
+                    <button
+                      type="button"
+                      onClick={() => setRightWidth(0)}
+                      className="text-muted-foreground hover:bg-muted hover:text-foreground rounded p-1.5"
+                      aria-label="Hide right panel"
+                    >
+                      <PanelRightCloseIcon className="size-4" />
+                    </button>
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-auto">{right}</div>
+                </div>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setRightWidth(defaultRightWidth)}
+                className="border-border/50 bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground absolute top-0 right-0 bottom-0 z-10 flex w-6 flex-col items-center justify-center gap-1 border-l transition-colors"
+                aria-label="Show right panel"
+              >
+                <PanelRightIcon className="size-4" />
+              </button>
+            )}
           </>
         )}
-
-        <ResizablePanel defaultSize={100} minSize={0} className="min-w-0">
-          <div className="relative h-full w-full">
-            {/* Center: always full size, never cut */}
-            <div className={cn("h-full w-full flex flex-col overflow-auto", centerClassName)}>
-              {children}
-            </div>
-
-            {/* Right: overlay in front of center; can be fully hidden (width 0) */}
-            {hasRight && (
-              <>
-                {rightWidth > 0 ? (
-                  <>
-                    <div
-                      role="separator"
-                      aria-orientation="vertical"
-                      onMouseDown={handleRightDragStart}
-                      className="absolute top-0 bottom-0 z-20 w-1 cursor-col-resize hover:bg-primary/30 active:bg-primary/50"
-                      style={{ right: rightWidth }}
-                      aria-label="Resize right panel"
-                    />
-                    <div
-                      className={cn(
-                        "absolute top-0 bottom-0 right-0 z-10 flex flex-col overflow-hidden border-l border-border bg-background shadow-lg",
-                        rightClassName,
-                      )}
-                      style={{ width: rightWidth }}
-                    >
-                      <div className="flex shrink-0 items-center justify-end border-b border-border/50 px-1 py-1">
-                        <button
-                          type="button"
-                          onClick={() => setRightWidth(0)}
-                          className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                          aria-label="Hide right panel"
-                        >
-                          <PanelRightCloseIcon className="size-4" />
-                        </button>
-                      </div>
-                      <div className="min-h-0 flex-1 overflow-auto">{right}</div>
-                    </div>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setRightWidth(defaultRightWidth)}
-                    className="absolute top-0 bottom-0 right-0 z-10 flex w-6 flex-col items-center justify-center gap-1 border-l border-border/50 bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label="Show right panel"
-                  >
-                    <PanelRightIcon className="size-4" />
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+      </div>
     </div>
   );
 }
