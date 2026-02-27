@@ -1,4 +1,5 @@
-export type AgentRole = 'pm' | 'fe' | 'be_sc' | 'researcher' | 'marketing'
+export type AgentRole = 'pm' | 'fe' | 'be_sc' | 'marketing'
+export type AgentEventType = 'agent.started' | 'agent.delta' | 'agent.done' | 'agent.error' | 'run.done'
 
 export interface StartRunBody {
   idea?: string
@@ -10,20 +11,16 @@ export interface RunParams {
   runId: string
 }
 
-export interface AgentEvent {
-  id: string
-  runId: string
-  role: AgentRole
-  type: 'agent.started' | 'agent.delta' | 'agent.done' | 'run.done'
-  text: string
-  createdAt: string
+export interface EventsQuery {
+  fromSeq?: number
 }
 
-export interface AgentRun {
-  id: string
-  status: 'running' | 'completed'
-  source: 'chat' | 'prd'
-  input: string
-  createdAt: string
-  updatedAt: string
+export interface StreamEvent {
+  runId: string
+  agentRunId: string
+  role: AgentRole
+  seq: number
+  eventType: AgentEventType
+  payload: Record<string, unknown>
+  createdAt?: Date
 }

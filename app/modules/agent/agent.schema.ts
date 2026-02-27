@@ -18,6 +18,14 @@ const AgentSchema = {
       },
     },
   },
+  eventsQuery: {
+    querystring: {
+      type: 'object',
+      properties: {
+        fromSeq: { type: 'number', minimum: 1 },
+      },
+    },
+  },
 }
 
 export default AgentSchema
