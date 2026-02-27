@@ -5,6 +5,9 @@ export interface StartRunBody {
   idea?: string
   prdText?: string
   source?: 'chat' | 'prd'
+  mode?: 'single' | 'squad'
+  role?: AgentRole
+  parallel?: boolean
 }
 
 export interface RunParams {

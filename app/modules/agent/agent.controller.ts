@@ -13,7 +13,7 @@ const AgentController = {
   ) => {
     const run = await AgentService.startRun(request.server, request.body)
 
-    return reply.json(run, 201)
+    return reply.json(run, 202)
   },
 
   getRun: async (
