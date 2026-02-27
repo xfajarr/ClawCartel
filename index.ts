@@ -1,4 +1,6 @@
+import '#app/config/env'
 import Fastify from 'fastify'
+import fastifyJwt from '@fastify/jwt'
 import routes from '#app/routes/index'
 import AppConfig from '#app/config/app'
 import FastifyUtil from '#app/utils/fastify'
@@ -30,6 +32,13 @@ const fastify = Fastify({
     await FastifyUtil.registerCors(fastify)
     await FastifyUtil.registerRateLimit(fastify)
     await FastifyUtil.registerMultipart(fastify)
+    await fastify.register(fastifyJwt, {
+      secret: {
+        private: AppConfig.jwt.privateKey,
+        public: AppConfig.jwt.publicKey,
+      },
+      sign: { algorithm: 'RS256' },
+    })
 
     await fastify.register(routes)
 

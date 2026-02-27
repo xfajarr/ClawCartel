@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/tests
+vitest.config.ts
 
 # next.js
 /.next/
@@ -29,6 +31,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+
+# uploads
+/uploads
 
 # env files (can opt-in for committing if needed)
 .env*
