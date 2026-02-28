@@ -1,6 +1,8 @@
 import '#app/config/env'
 import Fastify from 'fastify'
 import fastifyJwt from '@fastify/jwt'
+import fastifySwagger from '@fastify/swagger'
+import fastifySwaggerUi from '@fastify/swagger-ui'
 import routes from '#app/routes/index'
 import AppConfig from '#app/config/app'
 import FastifyUtil from '#app/utils/fastify'
@@ -38,6 +40,34 @@ const fastify = Fastify({
         public: AppConfig.jwt.publicKey,
       },
       sign: { algorithm: 'RS256' },
+    })
+
+    // Swagger documentation
+    await fastify.register(fastifySwagger, {
+      openapi: {
+        info: {
+          title: 'ClawCartel API',
+          description: 'AI Agent Squad - Autonomous Discussion & Code Generation',
+          version: '1.0.0',
+        },
+        servers: [
+          { url: 'http://localhost:3000', description: 'Local development' },
+        ],
+        tags: [
+          { name: 'Autonomous', description: 'Autonomous multi-agent discussion & code generation' },
+          { name: 'Agent', description: 'Legacy agent endpoints' },
+          { name: 'Auth', description: 'Authentication' },
+          { name: 'User', description: 'User management' },
+          { name: 'Run', description: 'Run management' },
+        ],
+      },
+    })
+    await fastify.register(fastifySwaggerUi, {
+      routePrefix: '/documentation',
+      uiConfig: {
+        docExpansion: 'list',
+        deepLinking: false,
+      },
     })
 
     await fastify.register(routes)
