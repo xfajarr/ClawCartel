@@ -13,11 +13,20 @@ const AuthSchema = {
     response: {
       200: {
         type: 'object',
-        required: ['nonce', 'message', 'expiresAt'],
+        required: ['status', 'data'],
         properties: {
-          nonce: { type: 'string', description: 'One-time nonce for SIWS' },
-          message: { type: 'string', description: 'Message to sign (CAIP-74 format)' },
-          expiresAt: { type: 'string', format: 'date-time', description: 'Nonce expiry time' },
+          status: { type: 'number', example: 200 },
+          code: { type: ['string', 'null'] },
+          message: { type: ['string', 'null'] },
+          data: {
+            type: 'object',
+            required: ['nonce', 'message', 'expiresAt'],
+            properties: {
+              nonce: { type: 'string', description: 'One-time nonce for SIWS' },
+              message: { type: 'string', description: 'Message to sign (CAIP-74 format)' },
+              expiresAt: { type: 'string', format: 'date-time', description: 'Nonce expiry time' },
+            },
+          },
         },
       },
     },
@@ -39,11 +48,20 @@ const AuthSchema = {
     response: {
       200: {
         type: 'object',
-        required: ['token', 'userId', 'walletAddress'],
+        required: ['status', 'data'],
         properties: {
-          token: { type: 'string', description: 'RS256 JWT — use as Bearer token' },
-          userId: { type: 'integer', description: 'Authenticated user id' },
-          walletAddress: { type: ['string', 'null'], description: 'Wallet address' },
+          status: { type: 'number', example: 200 },
+          code: { type: ['string', 'null'] },
+          message: { type: ['string', 'null'] },
+          data: {
+            type: 'object',
+            required: ['token', 'userId', 'walletAddress'],
+            properties: {
+              token: { type: 'string', description: 'RS256 JWT — use as Bearer token' },
+              userId: { type: 'integer', description: 'Authenticated user id' },
+              walletAddress: { type: ['string', 'null'], description: 'Wallet address' },
+            },
+          },
         },
       },
     },
