@@ -12,9 +12,6 @@ const AuthController = {
       const data = await AuthService.generateSiwsNonce(address)
 
       return reply.json({
-        status: 200,
-        code: 'SUCCESS',
-        message: 'Nonce generated successfully',
         data: {
           nonce: data.nonce,
           message: data.message,
@@ -40,9 +37,6 @@ const AuthController = {
       const data = await AuthService.verifySiwsSignature(address, message, signature)
 
       return reply.json({
-        status: 200,
-        code: 'SUCCESS',
-        message: 'Signature verified successfully',
         data: {
           token: data.token,
           userId: data.userId,
