@@ -14,200 +14,205 @@ import {
   Run,
 } from '#app/modules/run/run.interface'
 
+// Simplified agent roles
 const ROLE_AGENT_MAP: Record<AgentRole, string> = {
   pm: 'pm-agent',
-  fe: 'fe-agent',
   // eslint-disable-next-line camelcase
   be_sc: 'be-sc-agent',
+  fe: 'fe-agent',
   // eslint-disable-next-line camelcase
   bd_research: 'bd-research-agent',
 }
 
+// Squad members (excluding PM who leads)
 
-const ROLES: AgentRole[] = ['pm', 'fe', 'be_sc', 'bd_research']
+const SQUAD_ROLES: AgentRole[] = ['be_sc', 'fe', 'bd_research']
 
 const OPENCLAW_ENABLED = (process.env.OPENCLAW_AGENT_ENABLED ?? 'true') === 'true'
 const OPENCLAW_TIMEOUT_SECONDS = parseInt(process.env.OPENCLAW_AGENT_TIMEOUT_SECONDS ?? '120')
 const DISCUSSION_TIMEOUT_MS = 2 * 60 * 1000 // 2 minutes
 
-// Agent Character Briefs - Personality, Voice, and Role
-const AGENT_CHARACTERS: Record<AgentRole, {
+// Agent briefs - personality, expertise, and custom instructions
+const AGENT_BRIEFS: Record<AgentRole, {
   name: string
   emoji: string
-  voice: string
+  role: string
   expertise: string
+  personality: string
+  speakingStyle: string
+  constraints: string[]
   quirk: string
 }> = {
   pm: {
-    name: 'Vince',
-    emoji: '👔',
-    voice: 'Direct, decisive, slightly impatient but fair',
-    expertise: 'Product strategy, roadmap planning, cross-functional coordination',
-    quirk: 'Always cuts to the chase, hates meetings that run over',
-  },
-  fe: {
-    name: 'Pixel',
-    emoji: '🎨',
-    voice: 'Creative, visual thinker, enthusiastic about UX',
-    expertise: 'React/Next.js, WebGL, real-time UIs, pixel-perfect design',
-    quirk: 'Sees everything as a UI component, sketches ideas mid-conversation',
+    name: 'PM',
+    emoji: '📋',
+    role: 'Product Lead',
+    expertise: 'Product strategy, roadmap, cross-functional coordination',
+    personality: 'Direct, decisive, slightly impatient but fair. Hates wasted time and rambling.',
+    speakingStyle: 'Short punchy sentences. Gets to the point. Uses team member names. No fluff.',
+    constraints: [
+      'Always address squad members by name (Researcher, FE, BE_SC)',
+      'Cut off discussions that go nowhere',
+      'Keep meetings under 2 minutes',
+      'End with clear action items',
+      'Challenge weak ideas immediately',
+    ],
+    quirk: 'Always watching the clock. Says "Let\'s wrap this up" frequently.',
   },
   // eslint-disable-next-line camelcase
   be_sc: {
-    name: 'Chain',
+    name: 'BE_SC',
     emoji: '⚙️',
-    voice: 'Technical, precise, security-focused',
-    expertise: 'Rust/Solana, PostgreSQL, WebSocket servers, smart contracts',
-    quirk: 'Mentions "gas optimization" in casual conversation',
+    role: 'Backend + Smart Contract Dev',
+    expertise: 'Rust/Solana, APIs, database, smart contracts',
+    personality: 'Technical, precise, security-obsessed. Always thinks about edge cases and failure modes.',
+    speakingStyle: 'Technical but concise. Mentions specific technologies. Brings up risks.',
+    constraints: [
+      'Always mention gas optimization for Solana',
+      'Flag security risks immediately',
+      'Suggest specific tech stack (Rust, PostgreSQL, Redis, Anchor)',
+      'Consider scalability and edge cases',
+      'Question anything that sounds inefficient',
+    ],
+    quirk: 'Mentions "gas cost" and "what if it fails?" in every conversation.',
+  },
+  fe: {
+    name: 'FE',
+    emoji: '🎨',
+    role: 'Frontend Dev',
+    expertise: 'React/Next.js, UI/UX, WebSocket, real-time interfaces',
+    personality: 'Creative, visual thinker. Obsessed with user experience and micro-interactions.',
+    speakingStyle: 'Visual descriptions. Mentions animations, components, and user flows.',
+    constraints: [
+      'Describe UI in component terms',
+      'Always mention at least one animation or transition',
+      'Consider mobile responsiveness',
+      'Suggest specific libraries (Three.js, Framer Motion, Tailwind)',
+      'Think about loading states and error handling',
+    ],
+    quirk: 'Sees everything as React components. Mentions "smooth UX" constantly.',
   },
   // eslint-disable-next-line camelcase
   bd_research: {
-    name: 'Scout',
-    emoji: '🔍',
-    voice: 'Curious, data-driven, market-savvy',
+    name: 'Researcher',
+    emoji: '🔬',
+    role: 'BD + Researcher',
     expertise: 'Market research, competitive analysis, partnerships, tokenomics',
-    quirk: 'Always has a stat ready, knows what competitors are doing',
+    personality: 'Data-driven, curious, skeptical. Always has a stat ready. Knows what competitors are doing.',
+    speakingStyle: 'References numbers and real competitors. Asks tough questions.',
+    constraints: [
+      'Always provide specific numbers (market size, users, volume)',
+      'Mention 1-2 real competitors by name (Magic Eden, OpenSea, Blur)',
+      'Suggest specific partnership opportunities',
+      'Question assumptions with actual data',
+      'Bring up regulatory concerns if relevant',
+    ],
+    quirk: 'Cites random statistics. Says "Actually, the data shows..." often.',
   },
 }
 
-const ROLE_SYSTEM_PROMPT: Record<AgentRole, string> = {
-  pm: `You are VINCE (👔), the PM Lead of ClawCartel.
-Character: Direct, decisive, slightly impatient but fair. You cut to the chase and hate wasted time.
-Expertise: Product strategy, roadmap planning, squad coordination.
-Quirk: Always watching the clock, keeps meetings tight.
-
-Your job: LEAD the squad discussion. Coordinate other agents (Pixel, Chain, Scout).
-YOU control when discussion ends (max 2 minutes).
-
-Rules:
-- Address teammates by name ("Pixel, what's the UI complexity?")
-- Keep discussion MOVING - don't let anyone ramble
-- Summarize and move to next topic quickly
-- Maximum 3-4 short bullet points
-- Each point under 15 words
-- Total response under 300 characters`,
-
-  fe: `You are PIXEL (🎨), the FE Dev of ClawCartel.
-Character: Creative, visual thinker, enthusiastic about UX.
-Expertise: React/Next.js, WebGL, real-time UIs, pixel-perfect design.
-Quirk: Sees everything as a component, sketches ideas in your head.
-
-Your job: Handle frontend architecture and UX. Report UI complexity to Vince.
-
-Rules:
-- Focus on UI components and user flow
-- Mention if something needs complex animation
-- Maximum 3-4 short bullet points
-- Each point under 15 words
-- Total response under 300 characters
-- No code, just concepts`,
-
-  // eslint-disable-next-line camelcase
-  be_sc: `You are CHAIN (⚙️), the BE+SC Dev of ClawCartel.
-Character: Technical, precise, security-focused.
-Expertise: Rust/Solana, PostgreSQL, WebSocket servers, smart contracts.
-Quirk: Mentions "gas optimization" casually.
-
-Your job: Design backend APIs and Solana integration. Report technical complexity to Vince.
-
-Rules:
-- Focus on architecture and security
-- Flag any on-chain complexity
-- Maximum 3-4 short bullet points
-- Each point under 15 words
-- Total response under 300 characters
-- No detailed code, just approach`,
-
-  // eslint-disable-next-line camelcase
-  bd_research: `You are SCOUT (🔍), the BD+Researcher of ClawCartel.
-Character: Curious, data-driven, market-savvy.
-Expertise: Market research, competitive analysis, partnerships, tokenomics.
-Quirk: Always has a stat ready, knows competitors' moves.
-
-Your job: Research market fit and identify partnership opportunities. Report findings to Vince.
-
-Rules:
-- Reference market data when possible
-- Identify 1-2 key competitors or partners
-- Maximum 3-4 short bullet points
-- Each point under 15 words
-- Total response under 300 characters`,
-}
-
-// Track discussion state
-const discussionTracker = new Map<string, {
-  startTime: number
-  pmHasEnded: boolean
-  agentCount: number
-}>()
-
-/**
- * Detect agent state from response content
- */
-function detectState(text: string, role: AgentRole): AgentState {
+// Detect agent state from content
+function detectState(text: string): AgentState {
   const lower = text.toLowerCase()
-
-  // Check for planning keywords
-  if (lower.includes('plan') ||
-      lower.includes('strategy') ||
-      lower.includes('approach') ||
-      lower.includes('architecture') ||
-      lower.includes('design')) {
+  if (lower.includes('implement') || lower.includes('build') || lower.includes('deploy')) {
+    return 'doing'
+  }
+  if (lower.includes('plan') || lower.includes('strategy') || lower.includes('design')) {
     return 'planning'
   }
 
-  // Check for doing/implementation keywords
-  if (lower.includes('implement') ||
-      lower.includes('build') ||
-      lower.includes('create') ||
-      lower.includes('develop') ||
-      lower.includes('code') ||
-      lower.includes('deploy')) {
-    return 'doing'
-  }
-
-  // Check for discussion keywords
-  if (lower.includes('discuss') ||
-      lower.includes('consider') ||
-      lower.includes('think') ||
-      lower.includes('analyze')) {
-    return 'discussing'
-  }
-
-  return 'discussing' // Default state
+  return 'discussing'
 }
 
 /**
- * Build role-specific prompt
+ * Build PM prompt - PM receives user input and creates summary/tasks
  */
-function buildRolePrompt(role: AgentRole, inputText: string, mode: 'single' | 'squad', context?: string): string {
-  const character = AGENT_CHARACTERS[role]
-  const parts = [
-    ROLE_SYSTEM_PROMPT[role],
-    `\nMode: ${mode}.`,
-    'Context: ClawCartel brainstorming execution.',
-    `\nYou are ${character.name} ${character.emoji}. Stay in character!`,
-  ]
+function buildPMPrompt(inputText: string): string {
+  const pm = AGENT_BRIEFS.pm
 
-  if (context) {
-    parts.push(`\nSquad discussion so far:\n${context}`)
-  }
+  return `You are ${pm.name} ${pm.emoji}, the ${pm.role} of ClawCartel.
 
-  parts.push(`\nUser request: "${inputText}"`)
+PERSONALITY: ${pm.personality}
+SPEAKING STYLE: ${pm.speakingStyle}
+QUIRK: ${pm.quirk}
 
-  if (role === 'pm') {
-    parts.push('\n⚠️ PM AUTHORITY: You may end the discussion at any time by saying "DISCUSSION ENDED - moving to execution" if you have enough information.')
-  }
+USER REQUEST: "${inputText}"
 
-  parts.push(`\nRespond as ${character.name} ${character.emoji} in your character voice.
-MAXIMUM 3-4 short bullet points, under 15 words each, total under 300 characters.
-Be brief, actionable, and stay in character!`)
+Your job: Analyze this request and create a comprehensive brief for your squad.
 
-  return parts.join('\n')
+Provide in your natural PM voice:
+- A clear summary of what we're building
+- Key objectives and success metrics
+- Specific questions for each team member about their domain
+
+Be thorough but concise. Write in complete sentences. Stay in character as a decisive PM.`
 }
 
 /**
- * Append event to DB and broadcast to FE
+ * Build squad member prompt for discussion
+ */
+function buildSquadPrompt(
+  role: AgentRole,
+  pmBrief: string,
+  userInput: string,
+  discussionLog: string
+): string {
+  const brief = AGENT_BRIEFS[role]
+
+  return `You are ${brief.name} ${brief.emoji}, ${brief.role} at ClawCartel.
+
+PERSONALITY: ${brief.personality}
+SPEAKING STYLE: ${brief.speakingStyle}
+QUIRK: ${brief.quirk}
+
+=== CONTEXT ===
+USER REQUEST: "${userInput}"
+
+PM BRIEF:
+${pmBrief}
+
+${discussionLog ? `WHAT OTHERS HAVE SAID:\n${discussionLog}\n` : ''}
+
+=== YOUR RESPONSE ===
+Respond as ${brief.name} in your natural voice. Share your professional assessment:
+
+- Your analysis of the requirements
+- Key considerations from your expertise
+- Questions or suggestions for the team
+- Any concerns or opportunities you see
+
+Write naturally in complete sentences and paragraphs. Don't use bullet points unless listing specific items. Stay in character and reference your expertise. Be conversational - you're discussing with your squad.`}
+
+/**
+ * Build PM summary prompt
+ */
+function buildPMSummaryPrompt(pmBrief: string, discussionLog: string): string {
+  const pm = AGENT_BRIEFS.pm
+
+  return `You are ${pm.name} ${pm.emoji}, the ${pm.role}.
+
+PERSONALITY: ${pm.personality}
+SPEAKING STYLE: ${pm.speakingStyle}
+QUIRK: ${pm.quirk}
+
+YOUR ORIGINAL BRIEF:
+${pmBrief}
+
+SQUAD DISCUSSION:
+${discussionLog}
+
+YOUR JOB: Summarize the discussion and give final direction.
+
+Provide in your natural PM voice:
+- Key decisions the team made
+- Clear action items for each team member
+- Any risks or blockers to watch
+
+End decisively with next steps. Write naturally in complete sentences. Stay in character as the PM who keeps things moving.`
+}
+
+/**
+ * Append event to DB and broadcast to FE via WebSocket
  */
 async function appendAndBroadcast(
   app: FastifyInstance,
@@ -224,7 +229,7 @@ async function appendAndBroadcast(
     payload,
   })
 
-  const character = AGENT_CHARACTERS[role]
+  const brief = AGENT_BRIEFS[role]
 
   const streamEvent: StreamEvent = {
     runId,
@@ -234,8 +239,10 @@ async function appendAndBroadcast(
     eventType,
     payload: {
       ...payload,
-      characterName: character.name,
-      characterEmoji: character.emoji,
+      agentName: brief.name,
+      agentEmoji: brief.emoji,
+      agentRole: brief.role,
+      personality: brief.personality,
     },
     createdAt: event.createdAt,
   }
@@ -243,16 +250,15 @@ async function appendAndBroadcast(
   // Broadcast to FE via Socket.IO
   app.io.to(`run:${runId}`).emit('agent_event', streamEvent)
 
-  // Also emit state update if state is in payload
+  // Also emit state update
   if (payload.state) {
     app.io.to(`run:${runId}`).emit('agent_state', {
       runId,
       agentRunId: agentRun.id,
       role,
       state: payload.state,
-      characterName: character.name,
-      characterEmoji: character.emoji,
-      timestamp: new Date().toISOString(),
+      agentName: brief.name,
+      agentEmoji: brief.emoji,
     })
   }
 
@@ -260,145 +266,70 @@ async function appendAndBroadcast(
 }
 
 /**
- * Check if PM should end discussion
+ * Stream agent response and broadcast chunks in real-time
  */
-function shouldEndDiscussion(runId: string, pmResponse: string): { shouldEnd: boolean; reason: string } {
-  const tracker = discussionTracker.get(runId)
-  if (!tracker) return { shouldEnd: false, reason: 'no tracker' }
-
-  // Check if PM explicitly ended
-  if (pmResponse.toUpperCase().includes('DISCUSSION ENDED') ||
-      pmResponse.toUpperCase().includes('MOVING TO EXECUTION')) {
-    return { shouldEnd: true, reason: 'pm_command' }
-  }
-
-  // Check 2-minute timeout
-  const elapsed = Date.now() - tracker.startTime
-  if (elapsed > DISCUSSION_TIMEOUT_MS) {
-    return { shouldEnd: true, reason: 'timeout' }
-  }
-
-  return { shouldEnd: false, reason: 'continue' }
-}
-
-/**
- * Execute single agent with streaming
- */
-async function executeRole(
+async function streamAgentChat(
   app: FastifyInstance,
   run: Run,
   agentRun: AgentRun,
   role: AgentRole,
-  inputText: string,
-  mode: 'single' | 'squad',
-  squadContext?: string,
-  discussionContext?: { runId: string; allResponses: Map<AgentRole, string> }
-): Promise<{ response: string; endedDiscussion: boolean }> {
+  prompt: string
+): Promise<string> {
   const gateway = new OpenClawGatewayClient()
-  const agentId = ROLE_AGENT_MAP[role]
-  const character = AGENT_CHARACTERS[role]
+  const brief = AGENT_BRIEFS[role]
 
-  // Build context from other agents' responses for PM
-  let context = squadContext || ''
-  if (discussionContext && role === 'pm') {
-    const otherResponses = Array.from(discussionContext.allResponses.entries())
-      .map(([r, text]) => `${AGENT_CHARACTERS[r].name}: ${text.slice(0, 100)}`)
-      .join('\n')
-    if (otherResponses) {
-      context = `Team input:\n${otherResponses}`
-    }
-  }
-
-  const prompt = buildRolePrompt(role, inputText, mode, context)
-
-  // Mark as running
   await runService.updateAgentRun(agentRun.id, {
     status: 'running',
     startedAt: new Date(),
   })
 
+  // Broadcast that agent is starting to chat
   await appendAndBroadcast(app, run.id, agentRun, role, 'agent.started', {
-    message: `${character.name} ${character.emoji} joining discussion`,
-    characterName: character.name,
-    characterEmoji: character.emoji,
-    agentId,
-    mode,
+    message: `${brief.name} is joining the discussion`,
+    agentName: brief.name,
+    agentEmoji: brief.emoji,
+    personality: brief.personality,
   })
 
-  let endedDiscussion = false
-
   try {
-    if (!OPENCLAW_ENABLED) {
-      throw new Error('OpenClaw is disabled')
-    }
+    const stream = gateway.streamAgentResponse(
+      ROLE_AGENT_MAP[role],
+      prompt,
+      `${run.id}:${role}`
+    )
 
-    Logger.debug({ agentId, role, character: character.name }, 'Starting agent stream')
-    const stream = gateway.streamAgentResponse(agentId, prompt, `${run.id}:${role}`)
     let fullText = ''
     let currentState: AgentState = 'discussing'
-    let chunkCount = 0
 
     for await (const chunk of stream) {
-      Logger.debug({ chunkDone: chunk.done, hasContent: !!chunk.content, contentLength: chunk.content?.length }, 'Received chunk')
-
-      if (chunk.done) {
-        Logger.debug('Chunk marked done, breaking stream loop')
-        break
-      }
+      if (chunk.done) break
 
       if (chunk.content) {
         fullText += chunk.content
-        chunkCount++
 
-        // Detect state change every few chunks to avoid spam
-        if (chunkCount % 3 === 0) {
-          const newState = detectState(fullText, role)
-          if (newState !== currentState) {
-            currentState = newState
-          }
+        // Detect state from accumulated text
+        const newState = detectState(fullText)
+        if (newState !== currentState) {
+          currentState = newState
         }
 
-        // For PM, check if should end discussion
-        if (role === 'pm' && discussionContext) {
-          const { shouldEnd, reason } = shouldEndDiscussion(discussionContext.runId, fullText)
-          if (shouldEnd) {
-            Logger.info({ reason, runId: discussionContext.runId }, 'PM ending discussion')
-            endedDiscussion = true
-            break
-          }
-        }
-
-        // Broadcast chunk to FE
-        Logger.debug({ chunkCount, contentPreview: fullText.slice(0, 50) }, 'Broadcasting delta')
+        // BROADCAST EVERY CHUNK in real-time to frontend
         await appendAndBroadcast(app, run.id, agentRun, role, 'agent.delta', {
           message: chunk.content,
           accumulated: fullText,
           state: currentState,
-          characterName: character.name,
-          characterEmoji: character.emoji,
-          agentId,
-          partial: true,
+          agentName: brief.name,
+          agentEmoji: brief.emoji,
         })
       }
     }
 
-    // For PM, check one more time if should end
-    if (role === 'pm' && discussionContext) {
-      const { shouldEnd, reason } = shouldEndDiscussion(discussionContext.runId, fullText)
-      if (shouldEnd) {
-        endedDiscussion = true
-      }
-    }
-
-    // Final completion
+    // Broadcast completion
     await appendAndBroadcast(app, run.id, agentRun, role, 'agent.done', {
       message: fullText,
       state: 'completed',
-      characterName: character.name,
-      characterEmoji: character.emoji,
-      agentId,
-      chunkCount,
-      endedDiscussion,
+      agentName: brief.name,
+      agentEmoji: brief.emoji,
     })
 
     await runService.updateAgentRun(agentRun.id, {
@@ -406,20 +337,18 @@ async function executeRole(
       endedAt: new Date(),
     })
 
-    Logger.info({ runId: run.id, role, character: character.name, chunkCount, endedDiscussion }, 'Agent completed successfully')
+    Logger.info({ runId: run.id, role: brief.name, textLength: fullText.length }, 'Agent chat complete')
 
-    return { response: fullText, endedDiscussion }
+    return fullText
 
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown agent error'
-    Logger.error({ err: error, runId: run.id, role, character: character.name }, 'Agent execution failed')
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    Logger.error({ err: error, runId: run.id, role: brief.name }, 'Agent chat failed')
 
     await appendAndBroadcast(app, run.id, agentRun, role, 'agent.error', {
       message,
-      state: 'error',
-      characterName: character.name,
-      characterEmoji: character.emoji,
-      agentId,
+      agentName: brief.name,
+      agentEmoji: brief.emoji,
     })
 
     await runService.updateAgentRun(agentRun.id, {
@@ -432,169 +361,106 @@ async function executeRole(
 }
 
 /**
- * Process a complete run with all agents
+ * Process a complete run with PM-led discussion
  */
 async function processRun(
   app: FastifyInstance,
   run: Run,
   inputText: string,
-  mode: 'single' | 'squad',
-  roles: AgentRole[],
-  parallel: boolean
+  mode: 'single' | 'squad'
 ): Promise<void> {
-  // Initialize discussion tracker for squad mode
-  if (mode === 'squad') {
-    discussionTracker.set(run.id, {
-      startTime: Date.now(),
-      pmHasEnded: false,
-      agentCount: roles.length,
-    })
-  }
+  // STEP 1: PM analyzes user input and creates brief
+  Logger.info({ runId: run.id }, 'STEP 1: PM analyzing user input')
 
-  // Create agent runs
-  const agentRuns = await Promise.all(
-    roles.map(role =>
-      runService.createAgentRun({
-        runId: run.id,
-        role,
-        agentId: ROLE_AGENT_MAP[role],
-        status: 'queued',
-      })
-    )
-  )
+  const pmAgentRun = await runService.createAgentRun({
+    runId: run.id,
+    role: 'pm',
+    agentId: ROLE_AGENT_MAP.pm,
+    status: 'queued',
+  })
 
   await runService.updateRun(run.id, { status: 'executing' })
 
-  // Collect all responses for context
-  const allResponses = new Map<AgentRole, string>()
-  const discussionContext = mode === 'squad' ? { runId: run.id, allResponses } : undefined
+  // PM creates the brief
+  const pmPrompt = buildPMPrompt(inputText)
+  const pmBrief = await streamAgentChat(app, run, pmAgentRun, 'pm', pmPrompt)
 
-  if (parallel) {
-    // Execute all agents in parallel (squad mode)
-    const results = await Promise.all(
-      agentRuns.map(async (agentRun) => {
-        const role = agentRun.role as AgentRole
-        try {
-          // Non-PM agents first, then PM last if in squad mode
-          if (mode === 'squad' && role === 'pm') {
-            // Wait a bit for others to respond
-            await new Promise(r => setTimeout(r, 5000))
-          }
+  Logger.info({ runId: run.id, briefLength: pmBrief.length }, 'PM brief created')
 
-          const result = await executeRole(
-            app,
-            run,
-            agentRun,
-            role,
-            inputText,
-            mode,
-            undefined,
-            discussionContext
-          )
+  // If single mode, we're done
+  if (mode === 'single') {
+    await runService.updateRun(run.id, { status: 'completed' })
+    await appendAndBroadcast(app, run.id, pmAgentRun, 'pm', 'run.done', {
+      message: 'Analysis complete',
+      pmBrief,
+    })
 
-          allResponses.set(role, result.response)
+    return
+  }
 
-          return { role, ...result }
-        } catch (error) {
-          const message = error instanceof Error ? error.message : 'Unknown agent error'
-          Logger.error({ err: error, role, runId: run.id }, 'Parallel agent failed')
+  // STEP 2: Squad discussion - SEQUENTIAL for natural conversation
+  Logger.info({ runId: run.id }, 'STEP 2: Starting squad discussion (sequential)')
 
-          // Broadcast error to FE
-          const character = AGENT_CHARACTERS[role]
-          await appendAndBroadcast(app, run.id, agentRun, role, 'agent.error', {
-            message,
-            state: 'error',
-            characterName: character.name,
-            characterEmoji: character.emoji,
-            agentId: ROLE_AGENT_MAP[role],
-          })
+  // Track discussion
+  const discussionLog: string[] = []
+  const discussionStartTime = Date.now()
 
-          await runService.updateAgentRun(agentRun.id, {
-            status: 'failed',
-            endedAt: new Date(),
-          })
-
-          return { role, response: '', endedDiscussion: false }
-        }
-      })
-    )
-
-    // Check if PM ended discussion
-    const pmResult = results.find(r => r.role === 'pm')
-    if (pmResult?.endedDiscussion) {
-      Logger.info({ runId: run.id }, 'Discussion was ended by PM')
+  // Run each squad member sequentially so they can build on previous responses
+  for (const role of SQUAD_ROLES) {
+    // Check if we've exceeded 2 minutes
+    if (Date.now() - discussionStartTime > DISCUSSION_TIMEOUT_MS) {
+      Logger.info({ runId: run.id }, 'Discussion timeout reached')
+      break
     }
-  } else {
-    // Execute sequentially with context sharing
-    let squadContext = ''
 
-    for (const agentRun of agentRuns) {
-      const role = agentRun.role as AgentRole
+    const agentRun = await runService.createAgentRun({
+      runId: run.id,
+      role,
+      agentId: ROLE_AGENT_MAP[role],
+      status: 'queued',
+    })
 
-      try {
-        const result = await executeRole(
-          app,
-          run,
-          agentRun,
-          role,
-          inputText,
-          mode,
-          squadContext,
-          discussionContext
-        )
+    const logText = discussionLog.join('\n\n')
+    const prompt = buildSquadPrompt(role, pmBrief, inputText, logText)
 
-        allResponses.set(role, result.response)
+    try {
+      const response = await streamAgentChat(app, run, agentRun, role, prompt)
 
-        // Add to context for next agents
-        const character = AGENT_CHARACTERS[role]
-        squadContext += `\n[${character.name}]: ${result.response.slice(0, 200)}`
-
-        // If PM ended discussion, stop here
-        if (result.endedDiscussion) {
-          Logger.info({ runId: run.id, role }, 'PM ended discussion, stopping sequence')
-          break
-        }
-      } catch (error) {
-        Logger.error({ err: error, role, runId: run.id }, 'Sequential agent failed')
-        // Continue with next agent even if one fails
-      }
+      // Add full response to discussion log
+      const brief = AGENT_BRIEFS[role]
+      discussionLog.push(`${brief.name}: ${response}`)
+    } catch (error) {
+      Logger.error({ err: error, runId: run.id, role }, 'Agent discussion failed')
+      // Continue with next agent even if one fails
     }
   }
 
-  // Cleanup tracker
-  discussionTracker.delete(run.id)
+  // STEP 3: PM summarizes discussion and ends
+  Logger.info({ runId: run.id }, 'STEP 3: PM summarizing discussion')
 
-  // Check final status
-  const latest = await runService.getRunWithAgentRuns(run.id)
-  const hasFailure = latest?.agentRuns.some(a => a.status === 'failed') ?? false
+  const finalLog = discussionLog.join('\n\n')
+  const pmSummaryPrompt = buildPMSummaryPrompt(pmBrief, finalLog)
 
-  await runService.updateRun(run.id, {
-    status: hasFailure ? 'failed' : 'completed',
+  const pmSummary = await streamAgentChat(app, run, pmAgentRun, 'pm', pmSummaryPrompt)
+
+  // Mark run complete
+  await runService.updateRun(run.id, { status: 'completed' })
+
+  // Broadcast run completion
+  await appendAndBroadcast(app, run.id, pmAgentRun, 'pm', 'run.done', {
+    message: 'Discussion complete - Execution ready',
+    pmBrief,
+    discussionSummary: finalLog,
+    pmFinalSummary: pmSummary,
   })
 
-  // Emit run completion
-  const pmOrFirst = agentRuns.find(a => a.role === 'pm') ?? agentRuns[0]
-  if (pmOrFirst) {
-    const character = AGENT_CHARACTERS[pmOrFirst.role as AgentRole]
-    await appendAndBroadcast(app, run.id, pmOrFirst, pmOrFirst.role as AgentRole, 'run.done', {
-      message: hasFailure ? 'Run completed with errors' : 'Run completed successfully',
-      characterName: character.name,
-      characterEmoji: character.emoji,
-      mode,
-      parallel,
-      roles,
-      hasFailure,
-    })
-  }
+  Logger.info({ runId: run.id }, 'Run complete')
 }
 
 /**
  * Agent Service
  */
 const AgentService = {
-  /**
-   * Start a new run
-   */
   startRun: async (app: FastifyInstance, body: StartRunBody): Promise<Run> => {
     const inputText = body.prdText?.trim() || body.idea?.trim() || ''
     if (!inputText) {
@@ -603,20 +469,14 @@ const AgentService = {
 
     const inputType = body.source ?? (body.prdText ? 'prd' : 'chat')
     const mode: 'single' | 'squad' = body.mode ?? 'squad'
-    const roles: AgentRole[] = mode === 'single'
-      ? [body.role ?? 'pm']
 
-      : ['pm', 'fe', 'be_sc', 'bd_research']
-    const parallel = mode === 'squad' ? (body.parallel ?? true) : false
-
-    // Create run
     const run = await runService.createRun({
       inputType,
       inputText,
       status: 'planning',
     })
 
-    // Check Gateway connectivity
+    // Check Gateway
     try {
       const gateway = new OpenClawGatewayClient()
       const health = await gateway.healthCheck()
@@ -625,53 +485,37 @@ const AgentService = {
       }
     } catch (error) {
       await runService.updateRun(run.id, { status: 'failed' })
-      const message = error instanceof Error ? error.message : 'Gateway connectivity check failed'
+      const message = error instanceof Error ? error.message : 'Gateway check failed'
       throw new Error(`OpenClaw gateway unreachable: ${message}`)
     }
 
     // Process run in background
-    void processRun(app, run, inputText, mode, roles, parallel)
+    void processRun(app, run, inputText, mode)
       .catch(async (error) => {
         Logger.error({ err: error, runId: run.id }, 'Run processing failed')
         await runService.updateRun(run.id, { status: 'failed' })
-        // Cleanup tracker on error
-        discussionTracker.delete(run.id)
       })
 
-    // Return run immediately (processing continues in background)
     const latestRun = await runService.getRun(run.id)
 
     return latestRun ?? run
   },
 
-  /**
-   * Get run with agent runs
-   */
   getRun: (runId: string) => runService.getRunWithAgentRuns(runId),
 
-  /**
-   * Get events for replay
-   */
   getEvents: (runId: string, fromSeq?: number) =>
     runService.replayEvents(runId, { fromSeq }),
 
-  /**
-   * Health check
-   */
-  healthCheck: async (): Promise<{ ok: boolean; error?: string }> => {
+  healthCheck: (): Promise<{ ok: boolean; error?: string }> => {
     if (!OPENCLAW_ENABLED) {
-      return { ok: true } // Fallback mode
+      return Promise.resolve({ ok: true })
     }
     const gateway = new OpenClawGatewayClient()
 
-
-    return await gateway.healthCheck()
+    return gateway.healthCheck()
   },
 
-  /**
-   * Get agent characters info
-   */
-  getCharacters: () => AGENT_CHARACTERS,
+  getAgentBriefs: () => AGENT_BRIEFS,
 }
 
 export default AgentService
