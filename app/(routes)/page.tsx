@@ -26,6 +26,7 @@ export default function IdeLayoutPage() {
         <IdeLayout
           defaultLeftSize={380}
           defaultRightWidth={300}
+          defaultRightOpen={false}
           left={
             <ChatPanel
               initialMessages={DUMMY_CHAT_MESSAGES}

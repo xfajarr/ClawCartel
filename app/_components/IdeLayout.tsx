@@ -30,6 +30,7 @@ export interface IdeLayoutProps {
   right?: React.ReactNode;
   defaultLeftSize?: number;
   defaultRightWidth?: number;
+  defaultRightOpen?: boolean;
   className?: string;
   leftClassName?: string;
   centerClassName?: string;
@@ -42,6 +43,7 @@ export function IdeLayout({
   right,
   defaultLeftSize = DEFAULT_LEFT_WIDTH,
   defaultRightWidth = DEFAULT_RIGHT_WIDTH,
+  defaultRightOpen = true,
   className,
   leftClassName,
   centerClassName,
@@ -53,7 +55,9 @@ export function IdeLayout({
 
   const [mobileView, setMobileView] = React.useState<MobileView>("center");
   const [leftWidth, setLeftWidth] = React.useState(defaultLeftSize);
-  const [rightWidth, setRightWidth] = React.useState(defaultRightWidth);
+  const [rightWidth, setRightWidth] = React.useState(
+    defaultRightOpen ? defaultRightWidth : 0,
+  );
   const leftDragRef = React.useRef(false);
   const rightDragRef = React.useRef(false);
   const leftStartRef = React.useRef({ x: 0, w: 0 });
