@@ -1,6 +1,6 @@
 "use client";
 
-import { ChatPanel, DUMMY_CHAT_MESSAGES } from "@/app/_components/chats/ChatPanel";
+import { ChatPanel } from "@/app/_components/chats/ChatPanel";
 import type { GameScene } from "@/app/_libs/game/GameScene";
 import { IdeLayout } from "@/app/_components/IdeLayout";
 import { PixelatedLoadingScreen } from "@/app/_components/ui/PixelatedLoadingScreen";
@@ -49,8 +49,6 @@ export default function IdeLayoutPage() {
           defaultRightOpen={false}
           left={
             <ChatPanel
-              roomId="global"
-              initialMessages={DUMMY_CHAT_MESSAGES}
               agentsPanelOpen={agentsPanelOpen}
               onAgentsPanelOpenChange={setAgentsPanelOpen}
               agentForDialog={agentForDialog}
@@ -59,7 +57,7 @@ export default function IdeLayoutPage() {
                 <>
                   <p>Start a conversation</p>
                   <p className="mt-1 text-xs">
-                    Click &quot;Agents&quot; or an agent avatar to read about them.
+                    Describe your project idea to kick off the agent discussion.
                   </p>
                 </>
               }

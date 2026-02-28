@@ -1,0 +1,13 @@
+export const PHASE_LABELS: Record<string, string> = {
+  round_1: "ROUND 1: INITIAL THOUGHTS",
+  round_2: "ROUND 2: DEBATE",
+  round_3: "ROUND 3: FINAL POSITIONS",
+  final: "FINAL DECISION",
+  awaiting_approval: "AWAITING APPROVAL",
+  code_generation: "🔨 CODE GENERATION",
+  phase_1_docs: "PHASE 1/4: DOCUMENTATION",
+  phase_2_backend: "PHASE 2/4: BACKEND",
+  phase_3_frontend: "PHASE 3/4: FRONTEND",
+  phase_4_deploy: "PHASE 4/4: DEPLOYMENT",
+  file_created: "📁 FILE CREATED",
+};

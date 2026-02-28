@@ -1,5 +1,6 @@
 import { TooltipProvider } from "./_components/ui/tooltip";
 import { AuthProvider } from "./_providers/AuthProvider";
+import { ChatProvider } from "./_providers/ChatProvider";
 import { QueryProvider } from "./_providers/QueryProvider";
 import { SolanaProvider } from "./_providers/SolanaProvider";
 import { ThemeProvider } from "./_providers/ThemeProvider";
@@ -18,6 +19,7 @@ const AppProviders = composeProviders([
   SolanaProvider,
   AuthProvider,
   TooltipProvider,
+  ChatProvider,
 ]);
 
 export function Providers({ children }: { children: React.ReactNode }) {
