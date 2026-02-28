@@ -1,4 +1,4 @@
-import Phaser from "phaser";
+import * as Phaser from "phaser";
 import { MapAgent, type MapAgentConfig } from "./MapAgent";
 
 const TILE_SIZE    = 48;

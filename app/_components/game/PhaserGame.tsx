@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type Phaser from "phaser";
+import type * as Phaser from "phaser";
 import type { GameScene } from "../../_libs/game/GameScene";
 
 type Props = {

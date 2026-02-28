@@ -1,4 +1,4 @@
-import Phaser from "phaser";
+import * as Phaser from "phaser";
 
 // ─── Animation frame layout for _run_16x16.png (24 cols × 2 rows) ────────────
 // LimeZu Moderninteriors character run sheet row 0:

@@ -26,7 +26,7 @@ export function AgentCard({
       type="button"
       onClick={onSelect}
       className={cn(
-        "bg-card hover:bg-accent/50 border-border text-left w-full rounded-lg border p-3 transition-colors",
+        "bg-card hover:bg-accent/50 border-border w-full rounded-lg border p-3 text-left transition-colors",
         selected && "ring-primary border-primary ring-2",
         className,
       )}
@@ -38,20 +38,18 @@ export function AgentCard({
           id={agent.id}
           size={compact ? 32 : 40}
           title={agent.name}
-          className="shrink-0 ring-2 ring-background"
+          className="ring-background shrink-0 ring-2"
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-foreground">{agent.name}</span>
+            <span className="text-foreground font-semibold">{agent.name}</span>
             {selected && (
               <MessageSquareIcon className="text-primary size-3.5 shrink-0" aria-hidden />
             )}
           </div>
           {!compact && (
             <>
-              <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
-                {agent.character}
-              </p>
+              <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">{agent.character}</p>
               <div className="mt-2 flex flex-wrap gap-1">
                 {agent.skills.slice(0, 4).map((skill) => (
                   <span
