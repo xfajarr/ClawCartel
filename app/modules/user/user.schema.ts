@@ -1,5 +1,8 @@
 const UserSchema = {
   list: {
+    tags: ['User'],
+    summary: 'List users',
+    description: 'List users with pagination',
     querystring: {
       type: 'object',
       properties: {
@@ -10,6 +13,9 @@ const UserSchema = {
   },
 
   detail: {
+    tags: ['User'],
+    summary: 'Get user',
+    description: 'Get user by ID',
     params: {
       type: 'object',
       required: [
@@ -22,6 +28,9 @@ const UserSchema = {
   },
 
   create: {
+    tags: ['User'],
+    summary: 'Create user',
+    description: 'Register a new user',
     body: {
       type: 'object',
       required: [
@@ -40,6 +49,9 @@ const UserSchema = {
   },
 
   update: {
+    tags: ['User'],
+    summary: 'Update user',
+    description: 'Update user profile or password',
     body: {
       type: 'object',
       required: [
@@ -57,6 +69,9 @@ const UserSchema = {
   },
 
   delete: {
+    tags: ['User'],
+    summary: 'Delete user',
+    description: 'Delete user by ID',
     params: {
       type: 'object',
       required: [

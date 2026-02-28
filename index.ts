@@ -43,6 +43,11 @@ const fastify = Fastify({
     })
 
     // Swagger documentation
+    const { url: appUrl } = AppConfig.app
+    const servers: Array<{ url: string; description: string }> = [
+      { url: 'http://localhost:3000', description: 'Local development' },
+      { url: appUrl, description: 'Dev server (current URL)' },
+    ]
     await fastify.register(fastifySwagger, {
       openapi: {
         info: {
@@ -50,15 +55,14 @@ const fastify = Fastify({
           description: 'AI Agent Squad - Autonomous Discussion & Code Generation',
           version: '1.0.0',
         },
-        servers: [
-          { url: 'http://localhost:3000', description: 'Local development' },
-        ],
+        servers,
         tags: [
           { name: 'Autonomous', description: 'Autonomous multi-agent discussion & code generation' },
           { name: 'Agent', description: 'Legacy agent endpoints' },
           { name: 'Auth', description: 'Authentication' },
           { name: 'User', description: 'User management' },
           { name: 'Run', description: 'Run management' },
+          { name: 'Upload', description: 'File upload and CDN' },
         ],
       },
     })

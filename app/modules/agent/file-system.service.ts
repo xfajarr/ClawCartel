@@ -9,7 +9,7 @@ import { promises as fs } from 'fs'
 import * as path from 'path'
 import Logger from '#app/utils/logger'
 
-const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || '/root/.openclaw/workspace/claw-cartel-projects'
+const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || '/home/xfajarr/.openclaw/workspace/claw-cartel-projects'
 
 export interface FileNode {
   name: string

@@ -12,7 +12,7 @@ export default function (app: FastifyInstance) {
 
   // Replay events for a run
   app.get('/:runId/replay', { schema: RunSchema.replayEvents }, RunController.replayEvents)
-  app.get('/:runId/next-seq', RunController.getNextSeq)
+  app.get('/:runId/next-seq', { schema: RunSchema.getNextSeq }, RunController.getNextSeq)
 
   // Agent Run routes
   app.get('/agent-runs', { schema: RunSchema.listAgentRuns }, RunController.listAgentRuns)

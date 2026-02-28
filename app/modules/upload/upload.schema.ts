@@ -1,15 +1,19 @@
 const UploadSchema = {
   upload: {
-    tags: ['upload'],
+    tags: ['Upload'],
+    summary: 'Upload file',
+    description: 'Upload a file (multipart)',
     body: {
       type: 'object',
       properties: {
-        file: { type: 'string' },
+        file: { type: 'string', format: 'binary' },
       },
     },
   },
   getCDNUrl: {
-    tags: ['upload'],
+    tags: ['Upload'],
+    summary: 'Get CDN URL',
+    description: 'Get CDN URL for an uploaded file by key',
     querystring: {
       type: 'object',
       properties: {

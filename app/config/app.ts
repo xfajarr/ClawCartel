@@ -2,12 +2,15 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
+const port = process.env.APP_PORT ?? '3000'
 const AppConfig = {
   app: {
     host: process.env.APP_HOST ?? '0.0.0.0',
-    port: parseInt(process.env.APP_PORT ?? '3000'),
+    port: parseInt(port),
     gracefulShutdownTimeoutMs: parseInt(process.env.APP_GRACEFUL_SHUTDOWN_TIMEOUT_MS ?? '5000'),
     frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:3000',
+    /** Public API URL (e.g. dev server). Used in Swagger servers list. */
+    url: process.env.APP_URL ?? `http://localhost:${port}`,
   },
   jwt: {
     privateKey: Buffer.from(

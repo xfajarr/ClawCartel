@@ -1,5 +1,8 @@
 const AuthSchema = {
   siwsNonce: {
+    tags: ['Auth'],
+    summary: 'Get SIWS nonce',
+    description: 'Request a one-time nonce for Sign-In With Solana (SIWS)',
     body: {
       type: 'object',
       required: ['address'],
@@ -21,6 +24,9 @@ const AuthSchema = {
   },
 
   siwsVerify: {
+    tags: ['Auth'],
+    summary: 'Verify SIWS signature',
+    description: 'Verify signed message and issue JWT',
     body: {
       type: 'object',
       required: ['address', 'message', 'signature'],

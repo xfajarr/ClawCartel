@@ -32,12 +32,18 @@ export default function (
             description: 'Run created successfully',
             type: 'object',
             properties: {
-              id: { type: 'string', format: 'uuid' },
-              status: { type: 'string', enum: ['created', 'planning', 'executing', 'awaiting_approval', 'completed', 'failed', 'cancelled'] },
-              inputType: { type: 'string', enum: ['chat', 'prd'] },
-              inputText: { type: 'string' },
-              createdAt: { type: 'string', format: 'date-time' },
-              updatedAt: { type: 'string', format: 'date-time' },
+              status: { type: 'number', example: 202 },
+              data: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string', format: 'uuid' },
+                  status: { type: 'string' },
+                  inputType: { type: 'string' },
+                  inputText: { type: 'string' },
+                  createdAt: { type: 'string', format: 'date-time' },
+                  updatedAt: { type: 'string', format: 'date-time' },
+                },
+              },
             },
           },
           503: {

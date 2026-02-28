@@ -1,6 +1,9 @@
 const RunSchema = {
   // Run schemas
   listRuns: {
+    tags: ['Run'],
+    summary: 'List runs',
+    description: 'List runs with optional filters and pagination',
     querystring: {
       type: 'object',
       properties: {
@@ -16,6 +19,9 @@ const RunSchema = {
   },
 
   getRun: {
+    tags: ['Run'],
+    summary: 'Get run',
+    description: 'Get run by ID',
     params: {
       type: 'object',
       required: ['id'],
@@ -26,6 +32,9 @@ const RunSchema = {
   },
 
   createRun: {
+    tags: ['Run'],
+    summary: 'Create run',
+    description: 'Create a new run',
     body: {
       type: 'object',
       required: ['inputType', 'inputText'],
@@ -42,6 +51,9 @@ const RunSchema = {
   },
 
   updateRun: {
+    tags: ['Run'],
+    summary: 'Update run',
+    description: 'Update run status or input',
     params: {
       type: 'object',
       required: ['id'],
@@ -62,6 +74,9 @@ const RunSchema = {
   },
 
   deleteRun: {
+    tags: ['Run'],
+    summary: 'Delete run',
+    description: 'Delete run by ID',
     params: {
       type: 'object',
       required: ['id'],
@@ -73,6 +88,9 @@ const RunSchema = {
 
   // Agent Run schemas
   listAgentRuns: {
+    tags: ['Run'],
+    summary: 'List agent runs',
+    description: 'List agent runs with optional filters',
     querystring: {
       type: 'object',
       properties: {
@@ -87,6 +105,9 @@ const RunSchema = {
   },
 
   getAgentRun: {
+    tags: ['Run'],
+    summary: 'Get agent run',
+    description: 'Get agent run by ID',
     params: {
       type: 'object',
       required: ['id'],
@@ -97,6 +118,9 @@ const RunSchema = {
   },
 
   createAgentRun: {
+    tags: ['Run'],
+    summary: 'Create agent run',
+    description: 'Create a new agent run',
     body: {
       type: 'object',
       required: ['runId', 'role', 'agentId'],
@@ -115,6 +139,9 @@ const RunSchema = {
   },
 
   updateAgentRun: {
+    tags: ['Run'],
+    summary: 'Update agent run',
+    description: 'Update agent run status',
     params: {
       type: 'object',
       required: ['id'],
@@ -134,6 +161,9 @@ const RunSchema = {
   },
 
   deleteAgentRun: {
+    tags: ['Run'],
+    summary: 'Delete agent run',
+    description: 'Delete agent run by ID',
     params: {
       type: 'object',
       required: ['id'],
@@ -145,6 +175,9 @@ const RunSchema = {
 
   // Agent Event schemas
   listAgentEvents: {
+    tags: ['Run'],
+    summary: 'List agent events',
+    description: 'List agent events with optional filters',
     querystring: {
       type: 'object',
       properties: {
@@ -161,6 +194,9 @@ const RunSchema = {
   },
 
   getAgentEvent: {
+    tags: ['Run'],
+    summary: 'Get agent event',
+    description: 'Get agent event by ID',
     params: {
       type: 'object',
       required: ['id'],
@@ -171,6 +207,9 @@ const RunSchema = {
   },
 
   createAgentEvent: {
+    tags: ['Run'],
+    summary: 'Create agent event',
+    description: 'Create a new agent event',
     body: {
       type: 'object',
       required: ['runId', 'agentRunId', 'seq', 'eventType', 'payload'],
@@ -188,6 +227,9 @@ const RunSchema = {
   },
 
   deleteAgentEvent: {
+    tags: ['Run'],
+    summary: 'Delete agent event',
+    description: 'Delete agent event by ID',
     params: {
       type: 'object',
       required: ['id'],
@@ -197,8 +239,24 @@ const RunSchema = {
     },
   },
 
+  getNextSeq: {
+    tags: ['Run'],
+    summary: 'Get next event sequence',
+    description: 'Get next sequence number for a run',
+    params: {
+      type: 'object',
+      required: ['runId'],
+      properties: {
+        runId: { type: 'string', format: 'uuid' },
+      },
+    },
+  },
+
   // Replay events for a run
   replayEvents: {
+    tags: ['Run'],
+    summary: 'Replay run events',
+    description: 'Replay agent events for a run with optional filters',
     params: {
       type: 'object',
       required: ['runId'],

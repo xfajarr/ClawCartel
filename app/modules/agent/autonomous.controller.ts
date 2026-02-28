@@ -13,7 +13,10 @@ const AutonomousController = {
   ) => {
     const run = await AutonomousAgentService.startRun(request.server, request.body)
 
-    return reply.json(run, 202)
+    return reply.status(202).send({
+      status: 202,
+      data: run,
+    })
   },
 
   getRun: async (
@@ -22,7 +25,10 @@ const AutonomousController = {
   ) => {
     const run = await runService.getRun(request.params.runId)
 
-    return reply.json(run)
+    return reply.send({
+      status: 200,
+      data: run,
+    })
   },
 
   continueToDevelopment: async (
@@ -34,10 +40,13 @@ const AutonomousController = {
 
     await AutonomousAgentService.continueToDevelopment(request.server, runId, approved)
 
-    return reply.json({
-      success: true,
-      message: approved ? 'Development phase started' : 'Run cancelled',
-      runId
+    return reply.send({
+      status: 200,
+      data: {
+        success: true,
+        message: approved ? 'Development phase started' : 'Run cancelled',
+        runId,
+      },
     })
   },
 
@@ -51,15 +60,21 @@ const AutonomousController = {
       const files = await fileSystem.listDirectory(runId)
       const stats = await fileSystem.getStats(runId)
 
-      return reply.json({
-        runId,
-        files,
-        stats,
+      return reply.send({
+        status: 200,
+        data: {
+          runId,
+          files,
+          stats,
+        },
       })
     } catch (error) {
       Logger.error({ runId, error }, 'Failed to list files')
 
-      return reply.status(500).json({ error: 'Failed to list files' })
+      return reply.status(500).send({
+        status: 500,
+        error: 'Failed to list files',
+      })
     }
   },
 
@@ -73,9 +88,15 @@ const AutonomousController = {
     try {
       const content = await fileSystem.readFile(runId, filePath)
 
-      return reply.json({ runId, filePath, content })
+      return reply.send({
+        status: 200,
+        data: { runId, filePath, content },
+      })
     } catch (error) {
-      return reply.status(404).json({ error: 'File not found' })
+      return reply.status(404).send({
+        status: 404,
+        error: 'File not found',
+      })
     }
   },
 
