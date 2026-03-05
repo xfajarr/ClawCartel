@@ -56,9 +56,7 @@ function AgentsPopoverContent({
 }) {
   return (
     <div className="flex flex-col gap-3 p-3">
-      <p className="text-muted-foreground text-xs">
-        Click an avatar to read about that agent.
-      </p>
+      <p className="text-muted-foreground text-xs">Click an avatar to read about that agent.</p>
       <div className="flex flex-wrap gap-3">
         {AGENTS.map((agent) => (
           <button
@@ -144,7 +142,7 @@ export function ChatPanel({
   const showInput = isWalletConnected && step !== "approval" && step !== "complete";
 
   return (
-    <div className={cn("bg-background flex h-full flex-col", className)}>
+    <div className={cn("flex h-full flex-col", className)}>
       {/* Header */}
       <div className="border-border/50 flex items-center justify-between border-b px-3 py-2 pr-10">
         <div className="flex items-center gap-2">
@@ -216,7 +214,12 @@ export function ChatPanel({
               const { bg } = getSolanaColorById(isUser ? "user" : agentId);
               const label = isUser ? "You" : (m.agentName ?? "Agent");
               const avatar = (
-                <PixelAvatar id={isUser ? "user" : agentId} size={36} title={label} className="shrink-0" />
+                <PixelAvatar
+                  id={isUser ? "user" : agentId}
+                  size={36}
+                  title={label}
+                  className="shrink-0"
+                />
               );
 
               return (
@@ -266,7 +269,8 @@ export function ChatPanel({
                     {m.content ? (
                       <span className="text-foreground">{m.content}</span>
                     ) : (
-                      !m.isDone && !isUser && (
+                      !m.isDone &&
+                      !isUser && (
                         <span className="text-muted-foreground text-xs italic">Thinking…</span>
                       )
                     )}

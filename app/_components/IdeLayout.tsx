@@ -23,6 +23,7 @@ const MAX_LEFT_WIDTH = 600;
 const DEFAULT_RIGHT_WIDTH = 280;
 const MIN_RIGHT_WIDTH = 0;
 const MAX_RIGHT_WIDTH = 2000;
+const PANEL_INSET = 8; /* m-2 */
 
 export interface IdeLayoutProps {
   left?: React.ReactNode;
@@ -159,7 +160,7 @@ export function IdeLayout({
             )}
           </div>
           <nav
-            className="border-border bg-background flex shrink-0 items-center justify-around border-t pt-1 pb-[env(safe-area-inset-bottom,0)]"
+            className="flex shrink-0 items-center justify-around border-t pt-1 pb-[env(safe-area-inset-bottom,0)]"
             aria-label="Main navigation"
           >
             {hasLeft && (
@@ -209,15 +210,27 @@ export function IdeLayout({
         </div>
       )}
 
-      {/* Desktop */}
+      {/* Desktop: center full-bleed; left and right panels overlay in front of map */}
       {isDesktop && (
-        <div className={cn("flex h-full w-full", className)}>
+        <div className={cn("relative flex h-full w-full", className)}>
+          <div className={cn("flex h-full w-full flex-col overflow-auto", centerClassName)}>
+            {children}
+          </div>
+
           {hasLeft &&
             (leftWidth > 0 ? (
               <>
                 <div
+                  role="separator"
+                  aria-orientation="vertical"
+                  onMouseDown={handleLeftDragStart}
+                  className="hover:bg-primary/30 active:bg-primary/50 absolute top-0 bottom-0 z-20 my-5 ml-2 w-1 cursor-col-resize rounded-full"
+                  style={{ left: leftWidth + PANEL_INSET }}
+                  aria-label="Resize left panel"
+                />
+                <div
                   className={cn(
-                    "border-border bg-background relative flex shrink-0 flex-col overflow-hidden border-r",
+                    "bg-card border-border absolute top-0 bottom-0 left-0 z-10 m-2 flex flex-col overflow-hidden rounded-xl border shadow-sm",
                     leftClassName,
                   )}
                   style={{ width: leftWidth }}
@@ -230,74 +243,59 @@ export function IdeLayout({
                   >
                     <PanelLeftCloseIcon className="size-4" />
                   </button>
-                  <div className="min-h-0 flex-1 overflow-hidden">{left}</div>
+                  <div className="bg-card min-h-0 flex-1 overflow-auto">{left}</div>
                 </div>
-                <div
-                  role="separator"
-                  aria-label="Resize left panel"
-                  onMouseDown={handleLeftDragStart}
-                  className="hover:bg-primary/30 active:bg-primary/50 w-1 shrink-0 cursor-col-resize"
-                />
               </>
             ) : (
               <button
                 type="button"
                 onClick={() => setLeftWidth(defaultLeftSize)}
-                className="border-border/50 bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground z-10 flex w-6 shrink-0 flex-col items-center justify-center gap-1 border-r transition-colors"
+                className="border-border bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground absolute top-0 left-0 z-10 my-2 ml-2 flex h-[calc(100%-1rem)] w-6 flex-col items-center justify-center gap-1 rounded-r-xl border border-l-0 transition-colors"
                 aria-label="Show left panel"
               >
                 <PanelLeftIcon className="size-4" />
               </button>
             ))}
 
-          <div className="relative min-w-0 flex-1">
-            <div className={cn("flex h-full w-full flex-col overflow-auto", centerClassName)}>
-              {children}
-            </div>
-
-            {hasRight && (
+          {hasRight &&
+            (rightWidth > 0 ? (
               <>
-                {rightWidth > 0 ? (
-                  <>
-                    <div
-                      role="separator"
-                      aria-orientation="vertical"
-                      onMouseDown={handleRightDragStart}
-                      className="hover:bg-primary/30 active:bg-primary/50 absolute top-0 bottom-0 z-20 my-5 mr-2 w-1 cursor-col-resize rounded-full"
-                      style={{ right: rightWidth }}
-                      aria-label="Resize right panel"
-                    />
-                    <div
-                      className={cn(
-                        "bg-card border-border absolute top-0 right-0 bottom-0 z-10 m-2 flex flex-col overflow-hidden rounded-xl border",
-                        rightClassName,
-                      )}
-                      style={{ width: rightWidth }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setRightWidth(0)}
-                        className="text-muted-foreground hover:bg-muted hover:text-foreground absolute top-2 right-2 z-10 rounded p-1.5"
-                        aria-label="Hide right panel"
-                      >
-                        <PanelRightCloseIcon className="size-4" />
-                      </button>
-                      <div className="bg-card min-h-0 flex-1 overflow-auto">{right}</div>
-                    </div>
-                  </>
-                ) : (
+                <div
+                  role="separator"
+                  aria-orientation="vertical"
+                  onMouseDown={handleRightDragStart}
+                  className="hover:bg-primary/30 active:bg-primary/50 absolute top-0 bottom-0 z-20 my-5 mr-2 w-1 cursor-col-resize rounded-full"
+                  style={{ right: rightWidth }}
+                  aria-label="Resize right panel"
+                />
+                <div
+                  className={cn(
+                    "bg-card border-border absolute top-0 right-0 bottom-0 z-10 m-2 flex flex-col overflow-hidden rounded-xl border shadow-sm",
+                    rightClassName,
+                  )}
+                  style={{ width: rightWidth }}
+                >
                   <button
                     type="button"
-                    onClick={() => setRightWidth(defaultRightWidth)}
-                    className="border-border/50 bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground absolute top-0 right-0 bottom-0 z-10 flex w-6 flex-col items-center justify-center gap-1 border-l transition-colors"
-                    aria-label="Show right panel"
+                    onClick={() => setRightWidth(0)}
+                    className="text-muted-foreground hover:bg-muted hover:text-foreground absolute top-2 right-2 z-10 rounded p-1.5"
+                    aria-label="Hide right panel"
                   >
-                    <PanelRightIcon className="size-4" />
+                    <PanelRightCloseIcon className="size-4" />
                   </button>
-                )}
+                  <div className="bg-card min-h-0 flex-1 overflow-auto">{right}</div>
+                </div>
               </>
-            )}
-          </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setRightWidth(defaultRightWidth)}
+                className="border-border bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground absolute top-0 right-0 z-10 my-2 mr-2 flex h-[calc(100%-1rem)] w-6 flex-col items-center justify-center gap-1 rounded-l-xl border border-r-0 transition-colors"
+                aria-label="Show right panel"
+              >
+                <PanelRightIcon className="size-4" />
+              </button>
+            ))}
         </div>
       )}
     </>
