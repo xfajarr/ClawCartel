@@ -37,3 +37,26 @@
   font-family: "PixeloidSans";
   src: url("/fonts/PixeloidSans.ttf");
 }
+
+@font-face {
+  font-family: "Parabole";
+  src: url("/fonts/Parabole.ttf");
+}
+
+@font-face {
+  font-family: "PpNeueMontreal-Bold";
+  src: url("/fonts/ppnuemontreal-bold.ttf");
+}
+
+@font-face {
+  font-family: "PpNeueMontreal-Book";
+  src: url("/fonts/ppneuemontreal-book.ttf");
+}
+
+@font-face {
+  font-family: "PixChicago";
+  src: url("/fonts/pixChicago.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
