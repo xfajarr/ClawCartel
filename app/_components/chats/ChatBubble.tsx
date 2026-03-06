@@ -30,17 +30,7 @@ export function ChatBubble({
     <MarkdownContent>{safeContent}</MarkdownContent>
   ) : (
     <TypewriterText text={safeContent} enabled={!!safeContent}>
-      {(visible, showCursor) => (
-        <>
-          <MarkdownContent>{visible}</MarkdownContent>
-          {showCursor && (
-            <span
-              className="typing-cursor ml-0.5 inline-block h-4 w-0.5 shrink-0 bg-current align-middle"
-              aria-hidden
-            />
-          )}
-        </>
-      )}
+      {(visible) => <MarkdownContent>{visible}</MarkdownContent>}
     </TypewriterText>
   );
 

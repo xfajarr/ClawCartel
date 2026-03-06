@@ -46,6 +46,7 @@ export type CodeTabProps = {
   onSelectFile: (path: string) => void;
   onCodeChange: (code: string) => void;
   onTreeLoad?: () => void;
+  treeRefreshTrigger?: number;
 };
 
 export default function CodeTab({
@@ -57,6 +58,7 @@ export default function CodeTab({
   onSelectFile,
   onCodeChange,
   onTreeLoad,
+  treeRefreshTrigger,
 }: CodeTabProps) {
   const isReady = status === "ready";
   const breadcrumb = currentFilePath ? currentFilePath.split("/") : [];
@@ -92,6 +94,7 @@ export default function CodeTab({
                 setMobileFilesOpen(false);
               }}
               onTreeLoad={onTreeLoad}
+              refreshTrigger={treeRefreshTrigger}
             />
           </div>
         </div>

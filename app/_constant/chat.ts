@@ -9,5 +9,8 @@ export const PHASE_LABELS: Record<string, string> = {
   phase_2_backend: "PHASE 2/4: BACKEND",
   phase_3_frontend: "PHASE 3/4: FRONTEND",
   phase_4_deploy: "PHASE 4/4: DEPLOYMENT",
+  phase_3_handoff: "PHASE 3: HANDOFF",
+  phase_1_brief: "PHASE 1: BRIEF",
+  phase_2_codegen_parallel: "PHASE 2: CODE GEN",
   file_created: "📁 FILE CREATED",
 };

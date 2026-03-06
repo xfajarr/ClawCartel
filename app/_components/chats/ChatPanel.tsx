@@ -6,9 +6,11 @@ import { ScrollArea } from "@/app/_components/ui/scroll-area";
 import { Textarea } from "@/app/_components/ui/textarea";
 import type { Agent } from "@/app/_data/agents";
 import { useAgents } from "@/app/_providers/AgentsProvider";
+import { PHASE_LABELS } from "@/app/_constant/chat";
 import { useChat } from "@/app/_providers/ChatProvider";
 import { useSolana } from "@/app/_providers/SolanaProvider";
 import { cn, shortenAddress } from "@/app/_libs/utils";
+import { FolderIcon, FileIcon } from "@/app/_components/Icons";
 import { BotIcon, CheckIcon, LogOut, SendIcon, WalletIcon, XIcon } from "lucide-react";
 import { AgentDialog } from "@/app/_components/agents/AgentDialog";
 import Image from "next/image";
@@ -37,6 +39,7 @@ export function ChatPanel({
     step,
     messages,
     loading,
+    phase,
     approvalData,
     startDiscussion,
     sendUserMessage,
@@ -83,7 +86,13 @@ export function ChatPanel({
     }
   };
 
-  const showInput = isWalletConnected && step !== "approval" && step !== "complete";
+  const isBuilding =
+    phase === PHASE_LABELS.code_generation ||
+    phase === PHASE_LABELS.file_created ||
+    phase === PHASE_LABELS.phase_1_brief ||
+    phase === PHASE_LABELS.phase_2_codegen_parallel;
+  const showInput =
+    isWalletConnected && step !== "approval" && !isBuilding && !loading;
 
   return (
     <div className={cn("flex h-full flex-col", className)}>
@@ -126,13 +135,17 @@ export function ChatPanel({
               }
 
               if (m.type === "file-created") {
+                const path = String(m.content).replace(/^[\s📁]*Created:\s*/i, "").trim() || m.content;
                 return (
                   <div
                     key={m.id}
-                    className="border-border/50 text-muted-foreground bg-muted/30 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs"
+                    className="border-border/50 text-muted-foreground bg-muted/30 flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs"
                   >
-                    <span>📄</span>
-                    <span className="font-mono">{m.content}</span>
+                    <FolderIcon className="text-foreground size-4 shrink-0" />
+                    <FileIcon className="text-foreground size-4 shrink-0" />
+                    <span className="min-w-0 truncate font-mono" title={path}>
+                      Created: {path}
+                    </span>
                   </div>
                 );
               }
@@ -140,9 +153,7 @@ export function ChatPanel({
               const isUser = m.type === "user";
               const label = isUser ? "You" : (m.agentName ?? "Agent");
               const resolvedAgent: Agent | undefined =
-                !isUser && m.agentName
-                  ? agents.find((a) => a.name === m.agentName)
-                  : undefined;
+                !isUser && m.agentName ? agents.find((a) => a.name === m.agentName) : undefined;
 
               return (
                 <ChatBubble
@@ -153,18 +164,14 @@ export function ChatPanel({
                   content={m.content}
                   isUser={isUser}
                   agent={resolvedAgent}
-                  onAvatarClick={
-                    resolvedAgent
-                      ? () => setAgentForDialog(resolvedAgent)
-                      : undefined
-                  }
+                  onAvatarClick={resolvedAgent ? () => setAgentForDialog(resolvedAgent) : undefined}
                 />
               );
             })
           )}
           {loading && (
             <div
-              className="flex w-full flex-col items-start animate-in fade-in-0 duration-200"
+              className="animate-in fade-in-0 flex w-full flex-col items-start duration-200"
               role="status"
               aria-live="polite"
               aria-label="Agent is thinking"
@@ -192,77 +199,79 @@ export function ChatPanel({
         </div>
       </ScrollArea>
 
-      {/* Input / Approval — same card area */}
-      <div className="bg-card-secondary mx-5 mb-5 shrink-0 rounded-2xl border p-2 [box-shadow:-4px_-4px_0px_0px_#8A8483_inset]">
-        {!isWalletConnected ? (
-          <div className="text-muted-foreground flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed py-6 text-center text-sm">
-            <WalletIcon className="size-8 opacity-50" />
-            <p className="font-pixeloid-sans text-center">Connect your wallet to chat</p>
+      {/* Input / Approval — same card area; hide entire card when nothing to show */}
+      {(!isWalletConnected || (step === "approval" && approvalData) || showInput) && (
+        <div className="bg-card-secondary mx-5 mb-5 shrink-0 rounded-2xl border p-2 [box-shadow:-4px_-4px_0px_0px_#8A8483_inset]">
+          {!isWalletConnected ? (
+            <div className="text-muted-foreground flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed py-6 text-center text-sm">
+              <WalletIcon className="size-8 opacity-50" />
+              <p className="font-pixeloid-sans text-center">Connect your wallet to chat</p>
 
-            <Button
-              className="font-parabole bg-background-secondary text-primary hover:bg-background-secondary/90 w-fit gap-2 rounded-full px-4"
-              onClick={() => setWalletOpen(true)}
-            >
-              Connect Wallet
-            </Button>
-          </div>
-        ) : step === "approval" && approvalData ? (
-          <div className="p-2">
-            <p className="font-parabole text-foreground mb-0.5 text-sm uppercase tracking-wide">
-              Discussion complete
-            </p>
-            <p className="font-pp-neue-montreal-book text-foreground mb-1 text-sm">
-              {approvalData.message}
-            </p>
-            <p className="text-muted-foreground font-pp-neue-montreal-book mb-4 text-xs">
-              The squad has agreed on the approach. Ready to generate code?
-            </p>
-            <div className="flex gap-2">
               <Button
-                size="sm"
-                className="font-parabole flex-1 rounded-full"
-                onClick={() => continueToDevelopment(true)}
-                disabled={loading}
+                className="font-parabole bg-background-secondary text-primary hover:bg-background-secondary/90 w-fit gap-2 rounded-full px-4"
+                onClick={() => setWalletOpen(true)}
               >
-                <CheckIcon className="mr-1.5 size-3.5" />
-                Approve &amp; Build
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="font-parabole flex-1 rounded-full"
-                onClick={() => continueToDevelopment(false)}
-                disabled={loading}
-              >
-                <XIcon className="mr-1.5 size-3.5" />
-                Reject
+                Connect Wallet
               </Button>
             </div>
-          </div>
-        ) : showInput ? (
-          <div className="relative flex gap-2 bg-transparent">
-            <Button
-              type="button"
-              size="icon"
-              className="text-muted-foreground hover:text-text-primary hover:bg-primary absolute right-1 bottom-1 size-9 shrink-0 bg-transparent"
-              onClick={handleSend}
-              disabled={loading || !input.trim()}
-              aria-label={step === "idle" ? "Start discussion" : "Send"}
-            >
-              <SendIcon className="size-4" />
-            </Button>
-            <Textarea
-              placeholder={step === "idle" ? "Type a message..." : "Message…"}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              rows={1}
-              className="ring-none min-h-20 resize-none border-none bg-transparent py-2 pr-14 text-sm focus-visible:ring-0 dark:bg-transparent"
-              disabled={loading}
-            />
-          </div>
-        ) : null}
-      </div>
+          ) : step === "approval" && approvalData ? (
+            <div className="p-2">
+              <p className="font-parabole text-foreground mb-0.5 text-sm tracking-wide uppercase">
+                Discussion complete
+              </p>
+              <p className="font-pp-neue-montreal-book text-foreground mb-1 text-sm">
+                {approvalData.message}
+              </p>
+              <p className="text-muted-foreground font-pp-neue-montreal-book mb-4 text-xs">
+                The squad has agreed on the approach. Ready to generate code?
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  className="font-parabole flex-1 rounded-full"
+                  onClick={() => continueToDevelopment(true)}
+                  disabled={loading}
+                >
+                  <CheckIcon className="mr-1.5 size-3.5" />
+                  Approve &amp; Build
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="font-parabole flex-1 rounded-full"
+                  onClick={() => continueToDevelopment(false)}
+                  disabled={loading}
+                >
+                  <XIcon className="mr-1.5 size-3.5" />
+                  Reject
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="relative flex gap-2 bg-transparent">
+              <Button
+                type="button"
+                size="icon"
+                className="text-muted-foreground hover:text-text-primary hover:bg-primary absolute right-1 bottom-1 size-9 shrink-0 bg-transparent"
+                onClick={handleSend}
+                disabled={loading || !input.trim()}
+                aria-label={step === "idle" ? "Start discussion" : "Send"}
+              >
+                <SendIcon className="size-4" />
+              </Button>
+              <Textarea
+                placeholder={step === "idle" ? "Type a message..." : "Message…"}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                rows={1}
+                className="ring-none min-h-20 resize-none border-none bg-transparent py-2 pr-14 text-sm focus-visible:ring-0 dark:bg-transparent"
+                disabled={loading}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Connect Wallet */}
       {isWalletConnected && (

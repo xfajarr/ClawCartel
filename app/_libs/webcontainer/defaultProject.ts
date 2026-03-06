@@ -1,6 +1,6 @@
 import type { FileSystemTree } from "@webcontainer/api";
 
-const DEFAULT_PAGE_CONTENT = `export default function Page() {
+const DEFAULT_APP_CONTENT = `export default function App() {
   return (
     <main
       style={{
@@ -71,69 +71,9 @@ const DEFAULT_PAGE_CONTENT = `export default function Page() {
 }
 `;
 
-export const defaultPageContent = DEFAULT_PAGE_CONTENT;
+export const defaultPageContent = DEFAULT_APP_CONTENT;
 
-export const defaultProject: FileSystemTree = {
-  "package.json": {
-    file: {
-      contents: JSON.stringify(
-        {
-          name: "claw-cartel",
-          private: true,
-          version: "0.0.0",
-          scripts: {
-            dev: "next dev",
-            build: "next build",
-            start: "next start",
-          },
-          dependencies: {
-            next: "^14.0.0",
-            react: "^18.2.0",
-            "react-dom": "^18.2.0",
-          },
-        },
-        null,
-        2
-      ),
-    },
-  },
-  "next.config.mjs": {
-    file: {
-      contents: `/** @type {import('next').NextConfig} */
-const nextConfig = {};
-export default nextConfig;
-`,
-    },
-  },
-  app: {
-    directory: {
-      "layout.js": {
-        file: {
-          contents: `import './globals.css';
-
-export const metadata = {
-  title: 'Claw Cartel',
-  description: 'Claw Cartel — Next.js app running in WebContainer',
-};
-
-export default function RootLayout({ children }) {
-  return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  );
-}
-`,
-        },
-      },
-      "page.jsx": {
-        file: {
-          contents: DEFAULT_PAGE_CONTENT,
-        },
-      },
-      "globals.css": {
-        file: {
-          contents: `@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap');
+const GLOBALS_CSS = `@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap');
 
 * { box-sizing: border-box; }
 body {
@@ -149,7 +89,93 @@ body {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.6; transform: scale(0.9); }
 }
+`;
+
+export const defaultProject: FileSystemTree = {
+  "package.json": {
+    file: {
+      contents: JSON.stringify(
+        {
+          name: "claw-cartel",
+          private: true,
+          version: "0.0.0",
+          type: "module",
+          scripts: {
+            dev: "vite",
+            build: "vite build",
+            preview: "vite preview",
+          },
+          dependencies: {
+            react: "^18.2.0",
+            "react-dom": "^18.2.0",
+          },
+          devDependencies: {
+            "@vitejs/plugin-react": "^4.2.1",
+            vite: "^5.0.0",
+          },
+        },
+        null,
+        2
+      ),
+    },
+  },
+  "index.html": {
+    file: {
+      contents: `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Claw Cartel</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
 `,
+    },
+  },
+  "vite.config.js": {
+    file: {
+      contents: `import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 5173,
+    strictPort: true,
+  },
+});
+`,
+    },
+  },
+  src: {
+    directory: {
+      "main.jsx": {
+        file: {
+          contents: `import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App.jsx';
+import './index.css';
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+`,
+        },
+      },
+      "App.jsx": {
+        file: {
+          contents: DEFAULT_APP_CONTENT,
+        },
+      },
+      "index.css": {
+        file: {
+          contents: GLOBALS_CSS,
         },
       },
     },

@@ -1,26 +1,41 @@
 "use client";
 
 import {
+  ensureParentDirs,
   getPreviewUrl,
   getStatus,
   getTerminalOutput,
   init,
   readFile,
+  rebuild,
   setStatusListener,
   setTerminalListener,
   writeFile,
 } from "@/app/_libs/webcontainer/core";
 import type { WebContainerStatus } from "@/app/_libs/webcontainer/core";
 import { defaultPageContent } from "@/app/_libs/webcontainer/defaultProject";
+import { useChat } from "@/app/_providers/ChatProvider";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { RotateCwIcon } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { Button } from "../ui/button";
 import CodeTab from "./CodeTab";
 import PreviewTab from "./PreviewTab";
 
-const DEFAULT_OPEN_FILE = "app/page.jsx";
+const DEFAULT_OPEN_FILE = "src/App.jsx";
 const WRITE_DEBOUNCE_MS = 500;
 
+/** Strip backend run root and only allow frontend; map frontend/ to project root (e.g. frontend/src/... → src/...). */
+function normalizeCodegenPath(backendPath: string): string | null {
+  const trimmed = backendPath.replace(/^\/+/, "").replace(/\/+$/, "");
+  const frontendIndex = trimmed.indexOf("frontend/");
+  if (frontendIndex === -1) return null;
+  const relative = trimmed.slice(frontendIndex + "frontend/".length);
+  return relative || null;
+}
+
 export default function Builder() {
+  const { codegenPendingWrites, ackCodegenWrite } = useChat();
   const [status, setStatus] = useState<WebContainerStatus>(getStatus());
   const [previewUrl, setPreviewUrl] = useState<string | null>(getPreviewUrl());
   const [code, setCode] = useState(defaultPageContent);
@@ -29,6 +44,9 @@ export default function Builder() {
   const [terminalOutput, setTerminalOutput] = useState(() => getTerminalOutput());
   const writeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasAutoSelectedRef = useRef(false);
+  const [treeRefreshTrigger, setTreeRefreshTrigger] = useState(0);
+  const switchedToCodegenRef = useRef(false);
+  const [isRebuilding, setIsRebuilding] = useState(false);
 
   const setPageCode = useCallback(
     (content: string) => {
@@ -103,6 +121,87 @@ export default function Builder() {
     };
   }, []);
 
+  // When codegen arrives and WebContainer isn't ready yet, start it so we can sync once ready
+  useEffect(() => {
+    const hasPending = Object.keys(codegenPendingWrites).length > 0;
+    const current = getStatus();
+    if (
+      hasPending &&
+      current !== "ready" &&
+      current !== "error" &&
+      current !== "booting" &&
+      current !== "installing" &&
+      current !== "starting"
+    ) {
+      init((url) => setPreviewUrl(url));
+    }
+  }, [codegenPendingWrites]);
+
+  // Apply codegen.delta updates: write to WebContainer and sync editor when status is ready (frontend only)
+  useEffect(() => {
+    const pending = codegenPendingWrites;
+    const paths = Object.keys(pending);
+    if (paths.length === 0 || status !== "ready") return;
+
+    switchedToCodegenRef.current = false;
+
+    for (const path of paths) {
+      const content = pending[path];
+      if (content === undefined) continue;
+
+      const localPath = normalizeCodegenPath(path);
+      if (!localPath) {
+        ackCodegenWrite(path);
+        continue;
+      }
+
+      (async () => {
+        try {
+          await ensureParentDirs(localPath);
+          await writeFile(localPath, content);
+
+          const isCurrentFile = localPath === currentFilePath;
+          const shouldSwitchToCodegen =
+            !switchedToCodegenRef.current &&
+            (currentFilePath === null || currentFilePath === DEFAULT_OPEN_FILE);
+
+          if (isCurrentFile) {
+            if (writeTimeoutRef.current) {
+              clearTimeout(writeTimeoutRef.current);
+              writeTimeoutRef.current = null;
+            }
+            setCode(content);
+          } else if (shouldSwitchToCodegen) {
+            switchedToCodegenRef.current = true;
+            setCurrentFilePath(localPath);
+            setCode(content);
+          }
+
+          setTreeRefreshTrigger((t) => t + 1);
+          ackCodegenWrite(path);
+        } catch (err) {
+          console.error("[Builder] codegen writeFile failed:", err);
+          setError(err instanceof Error ? err.message : "Failed to apply codegen");
+          ackCodegenWrite(path);
+        }
+      })();
+    }
+  }, [codegenPendingWrites, status, currentFilePath, ackCodegenWrite]);
+
+  const handleRebuild = useCallback(async () => {
+    setIsRebuilding(true);
+    setError(null);
+    try {
+      await rebuild();
+      setStatus(getStatus());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Rebuild failed");
+    } finally {
+      setIsRebuilding(false);
+      setStatus(getStatus());
+    }
+  }, []);
+
   if (typeof window !== "undefined" && !window.crossOriginIsolated) {
     return (
       <div className="flex h-full flex-col items-center justify-center p-4 text-center">
@@ -122,7 +221,19 @@ export default function Builder() {
   return (
     <div className="flex h-full flex-col">
       <Tabs defaultValue="preview" className="flex h-full flex-1 flex-col gap-0 px-0">
-        <h1 className="font-parabole mt-4 ml-4 text-lg lg:mt-2 lg:ml-2">Files</h1>
+        <div className="flex items-center justify-between pr-2">
+          <h1 className="font-parabole mt-4 ml-4 text-lg lg:mt-2 lg:ml-2">Files</h1>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="font-parabole mt-4 mr-10 gap-1.5 lg:mt-3"
+            onClick={handleRebuild}
+            disabled={isRebuilding || status !== "ready"}
+          >
+            <RotateCwIcon className={`size-3.5 ${isRebuilding ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
         <div className="shrink-0 p-2">
           <TabsList className="bg-primary/10 p-1">
             <TabsTrigger
@@ -154,6 +265,7 @@ export default function Builder() {
             onSelectFile={handleSelectFile}
             onCodeChange={setPageCode}
             onTreeLoad={handleTreeLoad}
+            treeRefreshTrigger={treeRefreshTrigger}
           />
         </TabsContent>
       </Tabs>

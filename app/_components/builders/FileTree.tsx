@@ -44,6 +44,8 @@ type FileTreeProps = {
   selectedPath: string | null;
   onSelectFile: (path: string) => void;
   onTreeLoad?: (tree: FileTreeNode[]) => void;
+  /** When this value changes, the tree will refresh (e.g. after codegen writes new files). */
+  refreshTrigger?: number;
 };
 
 function TreeItem({
@@ -114,7 +116,13 @@ function TreeItem({
   );
 }
 
-export function FileTree({ isReady, selectedPath, onSelectFile, onTreeLoad }: FileTreeProps) {
+export function FileTree({
+  isReady,
+  selectedPath,
+  onSelectFile,
+  onTreeLoad,
+  refreshTrigger,
+}: FileTreeProps) {
   const [tree, setTree] = useState<FileTreeNode[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -137,6 +145,12 @@ export function FileTree({ isReady, selectedPath, onSelectFile, onTreeLoad }: Fi
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (isReady && refreshTrigger != null && refreshTrigger > 0) {
+      refresh();
+    }
+  }, [isReady, refreshTrigger, refresh]);
 
   if (!isReady) {
     return (

@@ -29,6 +29,8 @@ interface SocketAgentPayload {
   role?: string;
 }
 
+const CODEGEN_DEBOUNCE_MS = 200;
+
 interface ChatContextType {
   step: RunStep;
   messages: AgentMessage[];
@@ -44,6 +46,9 @@ interface ChatContextType {
   messageCount: number;
   /** Last accumulated message per agent name, for map bubble chat */
   agentBubbles: Record<string, string>;
+  /** Pending codegen writes: file path → full accumulated content (for Builder to apply) */
+  codegenPendingWrites: Record<string, string>;
+  ackCodegenWrite: (path: string) => void;
   startDiscussion: (idea: string) => Promise<void>;
   sendUserMessage: (content: string) => string;
   removeMessage: (id: string) => void;
@@ -69,10 +74,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [fileCount, setFileCount] = useState(0);
   const [messageCount, setMessageCount] = useState(0);
   const [agentBubbles, setAgentBubbles] = useState<Record<string, string>>({});
+  const [codegenPendingWrites, setCodegenPendingWrites] = useState<Record<string, string>>({});
 
   // Refs for mutable values used inside callbacks without triggering re-renders
   const runIdRef = useRef<string | null>(null);
   const activeMessagesRef = useRef<Record<string, string>>({});
+  const codegenBuffersRef = useRef<Record<string, string>>({});
+  const codegenDebounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const fileCreatedIdRef = useRef(0);
 
   const mutateGetRunsId = useMutation({
     mutationFn: ChatService.getRunsId,
@@ -104,23 +113,22 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   }, [refreshFiles]);
 
   const handleEvent = useCallback(
-    (
-      event: {
-        eventType: string;
-        payload: Record<string, unknown>;
-        agent?: SocketAgentPayload;
-      },
-    ) => {
+    (event: {
+      eventType: string;
+      payload: Record<string, unknown>;
+      agent?: SocketAgentPayload;
+    }) => {
       const { eventType, payload } = event;
       const topLevelAgent = event.agent;
       const agentName =
-        (topLevelAgent?.name as string | undefined) ??
-        (payload.agentName as string | undefined);
+        (topLevelAgent?.name as string | undefined) ?? (payload.agentName as string | undefined);
       const agentId = topLevelAgent?.id;
       const agentRole = topLevelAgent?.role as string | undefined;
       const resolvedName =
         (typeof agentName === "string" ? agentName : null) ||
-        (typeof agentId !== "undefined" ? agents.find((a) => a.id === `agent-${agentId}`)?.name : null);
+        (typeof agentId !== "undefined"
+          ? agents.find((a) => a.id === `agent-${agentId}`)?.name
+          : null);
       const bubbleKey = resolvedName ?? `agent-${agentId ?? ""}`;
 
       if (payload.phase && typeof payload.phase === "string") {
@@ -173,10 +181,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
           if (phase === "file_created") {
             setFileCount((c) => c + 1);
+            fileCreatedIdRef.current += 1;
             setMessages((prev) => [
               ...prev,
               {
-                id: `file-${Date.now()}`,
+                id: `file-${fileCreatedIdRef.current}`,
                 type: AgentMessageType.FILE_CREATED,
                 content: payload.message as string,
               },
@@ -223,6 +232,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             setMessageCount((c) => c + 1);
             delete activeMessagesRef.current[bubbleKey];
           }
+          setLoading(false);
           break;
         }
 
@@ -238,6 +248,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           } else if (phase === "completed") {
             setStats((payload.stats as RunStats) ?? null);
             setStep(RunStep.COMPLETE);
+            setPhase(null);
             setAgentBubbles({});
             refreshFilesRef.current();
           } else if (phase === "rejected") {
@@ -251,12 +262,78 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     [agents],
   );
 
+  const ackCodegenWrite = useCallback((path: string) => {
+    setCodegenPendingWrites((prev) => {
+      const next = { ...prev };
+      delete next[path];
+      return next;
+    });
+  }, []);
+
+  const handleCodegenEvent = useCallback(
+    (raw: { eventType: string; payload: Record<string, unknown> }) => {
+      const { eventType, payload } = raw;
+      switch (eventType) {
+        case "codegen.started": {
+          const filePath = payload.filePath as string | undefined;
+          if (typeof filePath === "string") {
+            const existing = codegenDebounceRef.current[filePath];
+            if (existing) clearTimeout(existing);
+            delete codegenDebounceRef.current[filePath];
+            codegenBuffersRef.current[filePath] = "";
+          }
+          break;
+        }
+        case "codegen.delta": {
+          const filePath = payload.filePath as string | undefined;
+          const chunk = payload.chunk as string | undefined;
+          if (typeof filePath !== "string" || typeof chunk !== "string") break;
+          if (!codegenBuffersRef.current[filePath]) {
+            codegenBuffersRef.current[filePath] = "";
+          }
+          codegenBuffersRef.current[filePath] += chunk;
+          const existing = codegenDebounceRef.current[filePath];
+          if (existing) clearTimeout(existing);
+          codegenDebounceRef.current[filePath] = setTimeout(() => {
+            delete codegenDebounceRef.current[filePath];
+            const content = codegenBuffersRef.current[filePath];
+            if (content !== undefined) {
+              setCodegenPendingWrites((prev) => ({ ...prev, [filePath]: content }));
+            }
+          }, CODEGEN_DEBOUNCE_MS);
+          break;
+        }
+        case "codegen.done": {
+          const filePath = payload.filePath as string | undefined;
+          if (typeof filePath === "string") {
+            const existing = codegenDebounceRef.current[filePath];
+            if (existing) clearTimeout(existing);
+            delete codegenDebounceRef.current[filePath];
+            const content = codegenBuffersRef.current[filePath];
+            if (content !== undefined) {
+              setCodegenPendingWrites((prev) => ({ ...prev, [filePath]: content }));
+            }
+            delete codegenBuffersRef.current[filePath];
+          }
+          break;
+        }
+        case "codegen.error": {
+          const message =
+            (payload.message as string) ?? (payload.error as string) ?? "Code generation failed";
+          setError(typeof message === "string" ? message : "Code generation failed");
+          break;
+        }
+      }
+    },
+    [],
+  );
+
   const connectWebSocket = useCallback(
     (id: string) => {
       const socket = getSocket();
 
-      // Remove stale listeners so they don't stack across runs
       socket.off("agent_event");
+      socket.off("codegen_event");
       socket.off("disconnect");
 
       socket.on("disconnect", () => {
@@ -265,6 +342,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
       socket.on("agent_event", (raw) => {
         handleEvent(raw);
+      });
+
+      socket.on("codegen_event", (raw) => {
+        handleCodegenEvent(raw);
       });
 
       const joinRun = () => {
@@ -286,7 +367,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         console.error("[socket] connect_error", err.message, err);
       });
     },
-    [handleEvent],
+    [handleEvent, handleCodegenEvent],
   );
 
   const startDiscussion = useCallback(
@@ -338,6 +419,20 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     async (approved: boolean) => {
       if (!runIdRef.current) return;
       setError(null);
+      setApprovalData(null);
+      if (approved) {
+        setStep(RunStep.CHAT);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `marker-${Date.now()}`,
+            type: AgentMessageType.ROUND_MARKER,
+            content: "🚀 Starting Code Generation...",
+          },
+        ]);
+      } else {
+        setStep(RunStep.IDLE);
+      }
       setLoading(true);
       try {
         const response = await mutateContinueToDevelopment.mutateAsync({
@@ -345,26 +440,15 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           approved,
         });
         if (!response.data?.success) throw new Error(response.message ?? "Failed to continue");
-
-        setApprovalData(null);
-        if (approved) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `marker-${Date.now()}`,
-              type: AgentMessageType.ROUND_MARKER,
-              content: "🚀 Starting Code Generation...",
-            },
-          ]);
-          setStep(RunStep.CHAT);
-          // Keep loading true until first agent message arrives via socket (agent.started)
-        } else {
+        if (!approved) {
           setStep(RunStep.IDLE);
           setLoading(false);
         }
+        // When approved, keep loading true until first agent message arrives via socket (agent.started)
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to continue");
         setLoading(false);
+        if (approved) setStep(RunStep.APPROVAL);
       }
     },
     [mutateContinueToDevelopment],
@@ -396,6 +480,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       fileCount,
       messageCount,
       agentBubbles,
+      codegenPendingWrites,
+      ackCodegenWrite,
       startDiscussion,
       sendUserMessage,
       removeMessage,
@@ -417,6 +503,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       fileCount,
       messageCount,
       agentBubbles,
+      codegenPendingWrites,
+      ackCodegenWrite,
       startDiscussion,
       sendUserMessage,
       removeMessage,

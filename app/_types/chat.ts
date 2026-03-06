@@ -76,3 +76,25 @@ export interface AutonomusFilesProjectResponse {
     totalSize: number;
   };
 }
+
+export type CodegenEventType = "codegen.started" | "codegen.delta" | "codegen.done" | "codegen.error";
+
+export interface CodegenDeltaPayload {
+  filePath: string;
+  chunk: string;
+  lineNumber?: number;
+  timestamp?: string;
+}
+
+export interface CodegenStartedPayload {
+  filePath?: string;
+}
+
+export interface CodegenDonePayload {
+  filePath: string;
+}
+
+export interface CodegenErrorPayload {
+  message?: string;
+  error?: string;
+}

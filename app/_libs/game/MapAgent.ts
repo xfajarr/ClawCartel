@@ -82,6 +82,7 @@ export class MapAgent {
   private meetingRadius: number | null = null;
   private meetingWanderOffset = { x: 0, y: 0 };
   private meetingWanderTimer = 0;
+  private meetingArrived = false;
 
   constructor(scene: Phaser.Scene, config: MapAgentConfig) {
     this.scene = scene;
@@ -128,6 +129,7 @@ export class MapAgent {
       this.meetingRadius = null;
       this.meetingWanderOffset = { x: 0, y: 0 };
       this.meetingWanderTimer = 0;
+      this.meetingArrived = false;
       body.reset(this.sprite.x, this.sprite.y);
       body.setEnable(true);
       this.startIdle();
@@ -138,6 +140,7 @@ export class MapAgent {
       centerX != null && centerY != null ? { x: centerX, y: centerY } : null;
     this.meetingRadius = radius ?? null;
     this.meetingWanderOffset = { x: 0, y: 0 };
+    this.meetingArrived = false;
     this.meetingWanderTimer = Phaser.Math.Between(0, MEETING_WANDER_INTERVAL_MS_MAX);
     body.setEnable(false);
   }
@@ -241,7 +244,8 @@ export class MapAgent {
       const dx = this.meetingTarget.x - this.sprite.x;
       const dy = this.meetingTarget.y - this.sprite.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist <= MEETING_ARRIVED_DIST) {
+      if (!this.meetingArrived && dist <= MEETING_ARRIVED_DIST) this.meetingArrived = true;
+      if (this.meetingArrived) {
         this.meetingWanderTimer -= delta;
         if (this.meetingWanderTimer <= 0) {
           const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
