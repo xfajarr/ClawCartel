@@ -36,12 +36,12 @@ export function AppHeader({ className }: { className?: string }) {
         alt="Claw Cartel"
         width={500}
         height={500}
-        className="mt-2 h-12 w-auto object-contain"
+        className="mt-2 h-12 w-auto object-contain lg:hidden"
       />
 
       <div
         onClick={() => setWalletOpen(true)}
-        className="bg-card-accent mt-2 flex size-12 items-center justify-center gap-2 rounded-xl [box-shadow:-4px_-4px_0px_0px_#353333_inset]"
+        className="bg-card-accent mt-2 flex size-12 items-center justify-center gap-2 rounded-xl [box-shadow:-4px_-4px_0px_0px_#353333_inset] lg:hidden"
       >
         <Image
           src="/images/img-user.png"
