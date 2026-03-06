@@ -2,8 +2,11 @@
 
 import { cn } from "@/app/_libs/utils";
 import Image from "next/image";
+import { useSolana } from "../_providers/SolanaProvider";
 
 export function AppHeader({ className }: { className?: string }) {
+  const { setOpen: setWalletOpen } = useSolana();
+
   return (
     <header
       className={cn(
@@ -36,7 +39,10 @@ export function AppHeader({ className }: { className?: string }) {
         className="mt-2 h-12 w-auto object-contain"
       />
 
-      <div className="bg-card-accent mt-2 flex size-12 items-center justify-center gap-2 rounded-xl [box-shadow:-4px_-4px_0px_0px_#353333_inset]">
+      <div
+        onClick={() => setWalletOpen(true)}
+        className="bg-card-accent mt-2 flex size-12 items-center justify-center gap-2 rounded-xl [box-shadow:-4px_-4px_0px_0px_#353333_inset]"
+      >
         <Image
           src="/images/img-user.png"
           alt="Claw Cartel"

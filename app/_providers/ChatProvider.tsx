@@ -120,6 +120,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
               },
             ]);
           } else {
+            setLoading(false);
             const id = `msg-${payload.agentName as string}-${Date.now()}`;
             activeMessagesRef.current[payload.agentName as string] = id;
             setMessages((prev) => [
@@ -193,6 +194,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
         case "run.done": {
           const phase = payload.phase as string;
+          setLoading(false);
           if (phase === "awaiting_approval") {
             setApprovalData({
               message: payload.message as string,
@@ -274,9 +276,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         setRunId(response.data?.id);
         setStep(RunStep.CHAT);
         connectWebSocket(response.data?.id);
+        // Keep loading true until first agent message arrives via socket (agent.started)
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to start discussion");
-      } finally {
         setLoading(false);
       }
     },
@@ -286,6 +288,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const sendUserMessage = useCallback((content: string): string => {
     const id = `user-${Date.now()}`;
     if (!content.trim()) return id;
+    setLoading(true);
     setMessages((prev) => [...prev, { id, type: AgentMessageType.USER, content: content.trim() }]);
     return id;
   }, []);
@@ -317,12 +320,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             },
           ]);
           setStep(RunStep.CHAT);
+          // Keep loading true until first agent message arrives via socket (agent.started)
         } else {
           setStep(RunStep.IDLE);
+          setLoading(false);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to continue");
-      } finally {
         setLoading(false);
       }
     },

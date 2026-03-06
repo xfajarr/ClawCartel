@@ -6,7 +6,7 @@ import { ScrollArea } from "@/app/_components/ui/scroll-area";
 import { Textarea } from "@/app/_components/ui/textarea";
 import { useChat } from "@/app/_providers/ChatProvider";
 import { useSolana } from "@/app/_providers/SolanaProvider";
-import { cn, shortenAddress } from "@/app/_libs/utils";
+import { cn, getAgentColorByName, shortenAddress } from "@/app/_libs/utils";
 import { BotIcon, CheckIcon, LogOut, SendIcon, WalletIcon, XIcon } from "lucide-react";
 import { AgentDialog } from "@/app/_components/agents/AgentDialog";
 import type { Agent } from "@/app/_data/agents";
@@ -49,6 +49,16 @@ export function ChatPanel({
 
   const scrollToBottom = () =>
     requestAnimationFrame(() => scrollRef.current?.scrollIntoView({ behavior: "smooth" }));
+
+  const prevMessageCountRef = React.useRef(messages.length);
+  React.useEffect(() => {
+    if (loading) scrollToBottom();
+  }, [loading]);
+  React.useEffect(() => {
+    const prev = prevMessageCountRef.current;
+    prevMessageCountRef.current = messages.length;
+    if (messages.length > prev) scrollToBottom();
+  }, [messages.length]);
 
   const handleSend = () => {
     if (!isWalletConnected) return;
@@ -139,6 +149,50 @@ export function ChatPanel({
                 />
               );
             })
+          )}
+          {loading && (
+            <div
+              className="flex w-full flex-col items-start animate-in fade-in-0 duration-200"
+              role="status"
+              aria-live="polite"
+              aria-label="Agent is thinking"
+            >
+              <div className="flex items-center justify-between">
+                <Image
+                  src="/images/img-agent.png"
+                  alt="Agent"
+                  width={32}
+                  height={32}
+                  className="size-8 object-contain"
+                />
+                <p className="text-muted-foreground font-pp-neue-montreal-book text-lg"> </p>
+              </div>
+              <div className="ml-1">
+                <h1
+                  className="font-pp-neue-montreal-bold mt-1 text-lg"
+                  style={{ color: getAgentColorByName("Agent") }}
+                >
+                  Agent
+                </h1>
+                <div className="font-pp-neue-montreal-book text-foreground mt-1 flex items-center gap-1.5 text-sm">
+                  <span
+                    className="bg-primary h-2 w-2 animate-bounce rounded-full"
+                    style={{ animationDuration: "0.6s", animationDelay: "0ms" }}
+                    aria-hidden
+                  />
+                  <span
+                    className="bg-primary h-2 w-2 animate-bounce rounded-full"
+                    style={{ animationDuration: "0.6s", animationDelay: "150ms" }}
+                    aria-hidden
+                  />
+                  <span
+                    className="bg-primary h-2 w-2 animate-bounce rounded-full"
+                    style={{ animationDuration: "0.6s", animationDelay: "300ms" }}
+                    aria-hidden
+                  />
+                </div>
+              </div>
+            </div>
           )}
           <div ref={scrollRef} />
         </div>
