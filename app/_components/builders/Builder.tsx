@@ -122,9 +122,7 @@ export default function Builder() {
   return (
     <div className="flex h-full flex-col">
       <Tabs defaultValue="preview" className="flex h-full flex-1 flex-col gap-0 px-0">
-        <h1 className="text-foreground font-geist-semi-bold px-3 pt-3 text-lg font-semibold">
-          Files
-        </h1>
+        <h1 className="font-parabole mt-2 ml-2 text-lg">Files</h1>
         <div className="shrink-0 p-2">
           <TabsList className="bg-primary/10 p-1">
             <TabsTrigger
@@ -146,7 +144,7 @@ export default function Builder() {
           <PreviewTab status={status} previewUrl={previewUrl} error={error} />
         </TabsContent>
 
-        <TabsContent value="code" className="min-h-0 flex-1 overflow-auto">
+        <TabsContent value="code" className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <CodeTab
             status={status}
             terminalOutput={terminalOutput}

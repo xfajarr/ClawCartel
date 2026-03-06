@@ -280,12 +280,14 @@ export function IdeLayout({
                   <button
                     type="button"
                     onClick={() => setRightWidth(0)}
-                    className="text-muted-foreground hover:bg-muted hover:text-foreground absolute top-2 right-2 z-10 rounded p-1.5"
+                    className="text-foreground hover:bg-muted hover:text-primary absolute top-2 right-2 z-10 rounded p-1.5"
                     aria-label="Hide right panel"
                   >
                     <PanelRightCloseIcon className="size-4" />
                   </button>
-                  <div className="bg-card min-h-0 flex-1 overflow-auto">{right}</div>
+                  <div className="bg-card min-h-0 flex-1 overflow-auto rounded-xl [box-shadow:-4px_4px_0px_0px_#827B79_inset]">
+                    {right}
+                  </div>
                 </div>
               </>
             ) : (
