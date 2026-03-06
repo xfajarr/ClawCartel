@@ -34,10 +34,10 @@ export function MarkdownContent({
   if (!children) return null;
 
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      className={cn(markdownClasses.root, className)}
-      components={{
+    <div className={cn(markdownClasses.root, className)}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
         p: ({ children }) => <p className={markdownClasses.p}>{children}</p>,
         h1: ({ children }) => <h1 className={markdownClasses.h1}>{children}</h1>,
         h2: ({ children }) => <h2 className={markdownClasses.h2}>{children}</h2>,
@@ -75,8 +75,9 @@ export function MarkdownContent({
         th: ({ children }) => <th className={markdownClasses.th}>{children}</th>,
         td: ({ children }) => <td className={markdownClasses.td}>{children}</td>,
       }}
-    >
-      {children}
-    </ReactMarkdown>
+      >
+        {children}
+      </ReactMarkdown>
+    </div>
   );
 }
