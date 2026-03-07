@@ -140,7 +140,7 @@ export function ChatPanel({
               </p>
             </div>
           ) : (
-            messages.map((m) => {
+            messages.map((m, index) => {
               if (m.type === "round-marker") {
                 return (
                   <div key={m.id} className="flex items-center gap-2 py-1">
@@ -154,16 +154,30 @@ export function ChatPanel({
               }
 
               if (m.type === "file-created") {
-                const path = String(m.content).replace(/^[\s📁]*Created:\s*/i, "").trim() || m.content;
+                let alreadyShownInTurn = false;
+                for (let i = index - 1; i >= 0; i--) {
+                  const prevMsg = messages[i];
+                  if (prevMsg.type === "file-created") {
+                    alreadyShownInTurn = true;
+                    break;
+                  }
+                  if (prevMsg.type === "user" || prevMsg.type === "agent") {
+                    break;
+                  }
+                }
+
+                if (alreadyShownInTurn) {
+                  return null;
+                }
+
                 return (
                   <div
                     key={m.id}
                     className="border-border/50 text-muted-foreground bg-muted/30 flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs"
                   >
                     <FolderIcon className="text-foreground size-4 shrink-0" />
-                    <FileIcon className="text-foreground size-4 shrink-0" />
-                    <span className="min-w-0 truncate font-mono" title={path}>
-                      Created: {path}
+                    <span className="min-w-0 truncate font-mono">
+                      Building....
                     </span>
                   </div>
                 );
