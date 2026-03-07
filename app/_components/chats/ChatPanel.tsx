@@ -11,7 +11,7 @@ import { useChat } from "@/app/_providers/ChatProvider";
 import { useSolana } from "@/app/_providers/SolanaProvider";
 import { cn, shortenAddress } from "@/app/_libs/utils";
 import { FolderIcon, FileIcon } from "@/app/_components/Icons";
-import { BotIcon, CheckIcon, LogOut, SendIcon, WalletIcon, XIcon } from "lucide-react";
+import { BotIcon, CheckIcon, LogOut, RotateCcw, SendIcon, WalletIcon, XIcon } from "lucide-react";
 import { AgentDialog } from "@/app/_components/agents/AgentDialog";
 import Image from "next/image";
 import { ChatBubble } from "./ChatBubble";
@@ -44,6 +44,7 @@ export function ChatPanel({
     startDiscussion,
     sendUserMessage,
     continueToDevelopment,
+    resetThread,
   } = useChat();
 
   const [input, setInput] = React.useState("");
@@ -101,7 +102,25 @@ export function ChatPanel({
         <div className="flex items-center gap-2">
           <span className="font-parabole mt-2 ml-2 text-lg">Chat</span>
         </div>
-        <BotIcon className="mt-2 mr-2 size-5 lg:mr-0" />
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => resetThread()}
+            disabled={loading}
+            className="text-muted-foreground hover:text-foreground mt-2 rounded p-1 disabled:opacity-50"
+            aria-label="New thread"
+          >
+            <RotateCcw className="size-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setAgentForDialog(agents[0] ?? null)}
+            className="text-muted-foreground hover:text-foreground mt-2 mr-2 rounded p-1 lg:mr-0"
+            aria-label="Open agents"
+          >
+            <BotIcon className="size-5" />
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
@@ -304,6 +323,8 @@ export function ChatPanel({
         open={!!agentForDialog}
         onOpenChange={(open) => !open && setAgentForDialog(null)}
         agent={agentForDialog}
+        agents={agents}
+        onSelectAgent={setAgentForDialog}
       />
     </div>
   );

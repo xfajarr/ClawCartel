@@ -55,6 +55,7 @@ interface ChatContextType {
   continueToDevelopment: (approved: boolean) => Promise<void>;
   refreshFiles: () => Promise<void>;
   downloadProject: () => void;
+  resetThread: () => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -93,6 +94,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   const mutateGetFilesProject = useMutation({
     mutationFn: ChatService.getFilesProject,
+  });
+
+  const mutateStartNewThread = useMutation({
+    mutationFn: ChatService.startNewThread,
   });
 
   const refreshFiles = useCallback(async () => {
@@ -459,6 +464,34 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     window.open(`${APP_CONFIG.api_url}/autonomous/runs/${runIdRef.current}/download`, "_blank");
   }, []);
 
+  const resetThread = useCallback(async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const response = await mutateStartNewThread.mutateAsync({
+        idea: " ",
+        mode: "squad",
+      });
+      if (!response.data?.id) throw new Error(response.message ?? "Failed to start new thread");
+      runIdRef.current = response.data.id;
+      setRunId(response.data.id);
+      setMessages([]);
+      setStep(RunStep.CHAT);
+      setApprovalData(null);
+      setPhase(null);
+      setAgentBubbles({});
+      setCodegenPendingWrites({});
+      setStats(null);
+      setFileCount(0);
+      setMessageCount(0);
+      connectWebSocket(response.data.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to reset thread");
+    } finally {
+      setLoading(false);
+    }
+  }, [connectWebSocket, mutateStartNewThread]);
+
   useEffect(() => {
     return () => {
       disconnectSocket();
@@ -488,6 +521,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       continueToDevelopment,
       refreshFiles,
       downloadProject,
+      resetThread,
     }),
     [
       step,
@@ -511,6 +545,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       continueToDevelopment,
       refreshFiles,
       downloadProject,
+      resetThread,
     ],
   );
 

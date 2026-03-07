@@ -24,6 +24,16 @@ export const ChatService = {
     return response.data;
   },
 
+  async startNewThread(
+    data: AutonomusRunsRequest,
+  ): Promise<ApiResponse<AutonomusRunsResponse>> {
+    const response = await baseAPI.post<ApiResponse<AutonomusRunsResponse>>(
+      "/v1/autonomous/runs/new-thread",
+      data,
+    );
+    return response.data;
+  },
+
   async continueToDevelopment(
     data: AutonomusContinueRequest,
   ): Promise<ApiResponse<AutonomusContinueResponse>> {
