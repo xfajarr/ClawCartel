@@ -21,6 +21,7 @@ const MEETING_WANDER_RADIUS = 20;
 const MEETING_WANDER_INTERVAL_MS_MIN = 1800;
 const MEETING_WANDER_INTERVAL_MS_MAX = 3200;
 const MEETING_WANDER_LERP = 0.006;
+const DIRECTION_DEADZONE = 4;
 const FRAME_RATE  = 8;    // animation fps
 const SCALE       = 2.5;  // 16px × 2.5 = 40px visible — fits nicely with 48px tiles
 
@@ -155,7 +156,7 @@ export class MapAgent {
     }
     if (!this.bubbleText && display === this.lastDismissedText) return;
     if (!this.bubbleText) {
-      this.bubbleBg = this.scene.add.graphics().setDepth(11);
+      this.bubbleBg = this.scene.add.graphics().setDepth(100);
       this.bubbleMask = this.scene.add.graphics();
       this.bubbleText = this.scene.add
         .text(0, 0, display, {
@@ -166,7 +167,7 @@ export class MapAgent {
           align: "left",
         })
         .setOrigin(0, 0)
-        .setDepth(12);
+        .setDepth(101);
       this.bubbleText.setMask(this.bubbleMask.createGeometryMask());
       this.bubbleDismissCountdownMs = BUBBLE_DISMISS_MS;
     } else {
@@ -276,8 +277,10 @@ export class MapAgent {
           const factor = 1 - Math.exp(-delta * MEETING_WANDER_LERP);
           this.sprite.x += wdx * factor;
           this.sprite.y += wdy * factor;
-          if (Math.abs(wdy) >= Math.abs(wdx)) this.direction = wdy > 0 ? "down" : "up";
-          else this.direction = wdx > 0 ? "right" : "left";
+          if (wdist > DIRECTION_DEADZONE) {
+            if (Math.abs(wdy) >= Math.abs(wdx)) this.direction = wdy > 0 ? "down" : "up";
+            else this.direction = wdx > 0 ? "right" : "left";
+          }
           this.sprite.play(
             `${this.sprite.texture.key}-walk-${this.direction}`,
             true,
@@ -285,19 +288,22 @@ export class MapAgent {
         } else if (this.meetingCenter) {
           const cx = this.meetingCenter.x - this.sprite.x;
           const cy = this.meetingCenter.y - this.sprite.y;
-          if (Math.abs(cy) >= Math.abs(cx)) this.direction = cy > 0 ? "down" : "up";
-          else this.direction = cx > 0 ? "right" : "left";
+          if (Math.abs(cx) > DIRECTION_DEADZONE || Math.abs(cy) > DIRECTION_DEADZONE) {
+            if (Math.abs(cy) >= Math.abs(cx)) this.direction = cy > 0 ? "down" : "up";
+            else this.direction = cx > 0 ? "right" : "left";
+          }
           this.playIdle();
         } else {
-          this.direction = "down";
           this.playIdle();
         }
       } else {
         const factor = 1 - Math.exp(-delta * MEETING_LERP_FACTOR);
         this.sprite.x += dx * factor;
         this.sprite.y += dy * factor;
-        if (Math.abs(dy) >= Math.abs(dx)) this.direction = dy > 0 ? "down" : "up";
-        else this.direction = dx > 0 ? "right" : "left";
+        if (dist > DIRECTION_DEADZONE) {
+          if (Math.abs(dy) >= Math.abs(dx)) this.direction = dy > 0 ? "down" : "up";
+          else this.direction = dx > 0 ? "right" : "left";
+        }
         this.sprite.play(
           `${this.sprite.texture.key}-walk-${this.direction}`,
           true,
@@ -340,7 +346,7 @@ export class MapAgent {
         body.blocked.right ||
         body.blocked.up ||
         body.blocked.down;
-      if (blocked) this.startWalking();
+      if (blocked) this.startWalkingAfterBlock();
       this.clampToBounds();
     }
   }
@@ -358,9 +364,26 @@ export class MapAgent {
   private startWalking() {
     this.state = "walking";
     this.stateTimer = Phaser.Math.Between(MIN_WALK_MS, MAX_WALK_MS);
+    this.pickDirectionAndVelocity(null);
+  }
 
-    // Pick a random direction
-    this.direction = DIRECTIONS[Phaser.Math.Between(0, 3)];
+  /** When blocked, pick a new direction that is not the opposite (avoids 180° spin). */
+  private startWalkingAfterBlock() {
+    this.state = "walking";
+    this.stateTimer = Phaser.Math.Between(MIN_WALK_MS, MAX_WALK_MS);
+    const opposite: Direction | null =
+      this.direction === "down" ? "up" :
+      this.direction === "up" ? "down" :
+      this.direction === "left" ? "right" :
+      this.direction === "right" ? "left" : null;
+    this.pickDirectionAndVelocity(opposite);
+  }
+
+  private pickDirectionAndVelocity(avoidDirection: Direction | null) {
+    const choices = avoidDirection
+      ? DIRECTIONS.filter((d) => d !== avoidDirection)
+      : DIRECTIONS;
+    this.direction = choices[Phaser.Math.Between(0, choices.length - 1)];
 
     const vel = AGENT_SPEED;
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;

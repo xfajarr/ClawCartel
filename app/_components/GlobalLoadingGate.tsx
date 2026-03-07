@@ -48,7 +48,7 @@ export function GlobalLoadingGate({ children }: { children: React.ReactNode }) {
       {showOverlay && (
         <div
           className={cn(
-            "fixed inset-0 z-9999 flex items-center justify-center bg-background transition-opacity duration-300",
+            "fixed inset-0 z-9999 flex items-center justify-center transition-opacity duration-300",
             phase === "fading" ? "opacity-0" : "opacity-100",
           )}
           aria-hidden="true"

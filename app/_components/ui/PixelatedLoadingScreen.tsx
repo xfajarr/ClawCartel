@@ -9,14 +9,11 @@ export interface PixelatedLoadingScreenProps {
   scanline?: boolean;
 }
 
-export function PixelatedLoadingScreen({
-  message,
-  className = "",
-}: PixelatedLoadingScreenProps) {
+export function PixelatedLoadingScreen({ message, className = "" }: PixelatedLoadingScreenProps) {
   return (
     <div
       className={cn(
-        "relative flex h-full w-full flex-col items-center justify-center gap-8 bg-background",
+        "bg-background relative flex h-full w-full flex-col items-center justify-center gap-8",
         className,
       )}
       role="status"

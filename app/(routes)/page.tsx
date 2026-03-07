@@ -22,7 +22,6 @@ const PhaserGame = dynamic(
 
 export default function IdeLayoutPage() {
   const sceneRef = useRef<GameScene | null>(null);
-  const [coords, setCoords] = useState({ x: 0, y: 0 });
   const [agentsPanelOpen, setAgentsPanelOpen] = useState(false);
   const [agentForDialog, setAgentForDialog] = useState<Agent | null>(null);
   const [isMobileSheetOpen, setMobileSheetOpen] = useState(false);
@@ -30,10 +29,6 @@ export default function IdeLayoutPage() {
   const { agents } = useAgents();
   const { step, runId, agentBubbles } = useChat();
   const discussionMode = step === "chat" && !!runId;
-
-  const handlePositionChange = useCallback((x: number, y: number) => {
-    setCoords({ x: Math.round(x), y: Math.round(y) });
-  }, []);
 
   const handleAgentInteract = useCallback(
     (agentName: string) => {
@@ -77,15 +72,11 @@ export default function IdeLayoutPage() {
         >
           <div className="absolute inset-0">
             <PhaserGame
-              onPositionChange={handlePositionChange}
               sceneRef={sceneRef}
               agentBubbles={agentBubbles}
               agents={agents.map((a) => ({ name: a.name, textureKey: a.textureKey }))}
               discussionMode={discussionMode}
             />
-            <div className="pointer-events-none absolute top-12 left-1/2 -translate-x-1/2 font-mono text-xs text-white/40">
-              {coords.x}, {coords.y}
-            </div>
             <MobileJoystick
               enabled={isMobileViewport && !isMobileSheetOpen}
               onMove={handleJoystickMove}
