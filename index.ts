@@ -70,6 +70,7 @@ const fastify = Fastify({
         tags: [
           { name: 'Autonomous', description: 'Autonomous multi-agent discussion & code generation' },
           { name: 'Agent', description: 'Legacy agent endpoints' },
+          { name: 'Solana Deploy', description: 'Solana program deployment APIs' },
           { name: 'Auth', description: 'Authentication' },
           { name: 'User', description: 'User management' },
           { name: 'Run', description: 'Run management' },
@@ -91,7 +92,7 @@ const fastify = Fastify({
 
     // Register tool handlers for the skill system
     const { initializeSkills } = await import('#app/agents/skills/index')
-    initializeSkills()
+    await initializeSkills()
 
     await fastify.register(routes)
 

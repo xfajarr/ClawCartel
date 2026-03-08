@@ -17,6 +17,13 @@ interface FileContentQuery {
   path: string
 }
 
+interface FixSmartContractBody {
+  errorLog: string
+  programName?: string
+}
+
+const APPROVAL_PRD_PATH = 'docs/PROJECT_PRD.md'
+
 async function getOptionalAuthenticatedUserId(
   request: FastifyRequest
 ): Promise<number | undefined> {
@@ -104,6 +111,27 @@ const AutonomousController = {
   },
 
   /**
+   * Triggers a targeted smart-contract maintenance fix on existing run workspace.
+   */
+  fixSmartContractBuild: async (
+    request: FastifyRequest<{ Params: RunParams; Body: FixSmartContractBody }>,
+    reply: FastifyReply
+  ) => {
+    const { runId } = request.params
+    const { errorLog, programName } = request.body
+
+    await AutonomousAgentService.fixSmartContractBuild(request.server, runId, {
+      errorLog,
+      programName,
+    })
+
+    return ResponseUtil.accepted(reply, {
+      runId,
+      action: 'smart_contract_fix_started',
+    })
+  },
+
+  /**
    * Lists generated files and workspace stats for a run.
    *
    * @param request Fastify request with `runId` route params.
@@ -179,6 +207,29 @@ const AutonomousController = {
       Logger.error({ runId, error }, 'Failed to create zip')
 
       return ResponseUtil.internalError(reply, 'Failed to create zip')
+    }
+  },
+
+  /**
+   * Downloads the approval-stage PRD markdown for a run.
+   */
+  downloadPrd: async (
+    request: FastifyRequest<{ Params: RunParams }>,
+    reply: FastifyReply
+  ) => {
+    const { runId } = request.params
+
+    try {
+      const content = await fileSystem.readFile(runId, APPROVAL_PRD_PATH)
+      reply.header('Content-Type', 'text/markdown; charset=utf-8')
+      reply.header(
+        'Content-Disposition',
+        `attachment; filename="clawcartel-prd-${runId.slice(0, 8)}.md"`
+      )
+
+      return reply.send(content)
+    } catch {
+      return ResponseUtil.notFound(reply, 'PRD file')
     }
   },
 }

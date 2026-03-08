@@ -57,22 +57,33 @@ export class PromptBuilder {
       sections.push(agent.files.rules)
     }
 
-    // 6. Team context — relationships, norms
+    // 6. Role-specific response contract
+    sections.push(this.buildRoleResponseContract(role))
+
+    // 7. Memory/context files loaded per agent
+    if (agent.files.memory) {
+      sections.push(`## Working Memory\n${agent.files.memory}`)
+    }
+    if (agent.files.context) {
+      sections.push(`## Operating Context\n${agent.files.context}`)
+    }
+
+    // 8. Team context — relationships, norms
     sections.push(this.buildTeamContext(shared))
 
     // ── VARIABLE SECTIONS (change per call) ──
 
-    // 7. Active tools for this phase (if provided)
+    // 9. Active tools for this phase (if provided)
     if (context?.activeTools) {
       sections.push(context.activeTools)
     }
 
-    // 8. Phase-specific instructions
+    // 10. Phase-specific instructions
     if (context?.phaseInstructions) {
       sections.push(`## Current Task\n${context.phaseInstructions}`)
     }
 
-    // 9. Conversation context
+    // 11. Conversation context
     if (context?.conversationContext) {
       sections.push(`## Discussion So Far\n${context.conversationContext}`)
     }
@@ -161,6 +172,42 @@ NO robot talk. NO "As an AI...". Own your expertise.`
     }
 
     return sections.join('\n\n')
+  }
+
+  private buildRoleResponseContract(role: AgentRole): string {
+    const common = [
+      '## Response Contract',
+      '- Be concise, concrete, and action-oriented.',
+      '- Do not fabricate external facts, metrics, or citations.',
+      '- If uncertain, state the uncertainty and ask for specific missing input.',
+    ]
+
+    if (role === 'pm') {
+      return `${common.join('\n')}
+- Include a single explicit **Decision:** line when a decision is required.
+- Include **Actions:** with owner + ETA when delegating work.
+- If blocked, include **Escalation:** with one clear question for the user.`
+    }
+
+    if (role === 'fe') {
+      return `${common.join('\n')}
+- For code tasks: output only valid codegen/file artifacts required by the runtime format.
+- For non-code tasks: include **Assumptions**, **Plan**, and **Risks** sections.
+- Never leave unresolved TODOs in final implementation responses.`
+    }
+
+    if (role === 'be_sc') {
+      return `${common.join('\n')}
+- Include security and failure-mode considerations in technical responses.
+- Explicitly state API/contract assumptions before proposing implementation.
+- Call out breaking risks and mitigation steps when relevant.
+- For Solana/Anchor codegen: keep config + dependency versions aligned, include required workspace release profile safety flags, avoid malformed file artifacts, and never emit recursive instruction handlers (e.g. \`initialize(ctx)\` inside \`initialize\`).`
+    }
+
+    return `${common.join('\n')}
+- Provide source-backed reasoning when presenting market or regulatory claims.
+- Include **Confidence:** high/medium/low for major recommendations.
+- Separate facts, assumptions, and recommendations clearly.`
   }
 
   private extractRoleTitle(agent: LoadedAgent): string {

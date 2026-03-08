@@ -12,7 +12,65 @@
 import Logger from '#app/utils/logger'
 import type { ToolCall } from '#app/agents/skills/skill.types'
 
-const TOOL_CALL_REGEX = /\[TOOL_CALL\]\s*\ntool:\s*(\w+)\s*\nparams:\s*({[\s\S]*?})\s*\n\[\/TOOL_CALL\]/g
+const TOOL_CALL_START = '[TOOL_CALL]'
+const TOOL_CALL_END = '[/TOOL_CALL]'
+const TOOL_NAME_REGEX = /^[a-z][a-z0-9_]*$/i
+const MAX_TOOL_CALLS_PER_RESPONSE = 12
+const MAX_TOOL_BLOCK_CHARS = 20_000
+
+function parseToolCallBlock(rawBlock: string): {
+    toolCall?: ToolCall
+    error?: string
+} {
+  const block = rawBlock.replace(/\r\n/g, '\n').trim()
+  if (!block) {
+    return { error: 'Empty [TOOL_CALL] block' }
+  }
+
+  const lines = block.split('\n')
+  const toolLineIndex = lines.findIndex(line => /^tool\s*:/i.test(line.trim()))
+  const paramsLineIndex = lines.findIndex(line => /^params\s*:/i.test(line.trim()))
+
+  if (toolLineIndex === -1) {
+    return { error: 'Missing "tool:" line' }
+  }
+  if (paramsLineIndex === -1) {
+    return { error: 'Missing "params:" line' }
+  }
+  if (paramsLineIndex < toolLineIndex) {
+    return { error: '"params:" appears before "tool:"' }
+  }
+
+  const toolLine = lines[toolLineIndex].trim()
+  const tool = toolLine.split(/:\s*/, 2)[1]?.trim() || ''
+  if (!TOOL_NAME_REGEX.test(tool)) {
+    return { error: `Invalid tool name "${tool}"` }
+  }
+
+  const paramsHead = lines[paramsLineIndex].replace(/^params\s*:/i, '').trim()
+  const paramsTail = lines.slice(paramsLineIndex + 1).join('\n')
+  const paramsText = [paramsHead, paramsTail].filter(Boolean).join('\n').trim() || '{}'
+
+  if (paramsText.length > MAX_TOOL_BLOCK_CHARS) {
+    return { error: `params JSON exceeds max size (${MAX_TOOL_BLOCK_CHARS} chars)` }
+  }
+
+  try {
+    const parsed = JSON.parse(paramsText)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { error: 'params must be a JSON object' }
+    }
+
+    return {
+      toolCall: {
+        tool,
+        params: parsed as Record<string, unknown>,
+      },
+    }
+  } catch {
+    return { error: 'params is not valid JSON' }
+  }
+}
 
 /**
  * Parse [TOOL_CALL]...[/TOOL_CALL] blocks from agent output.
@@ -21,43 +79,70 @@ const TOOL_CALL_REGEX = /\[TOOL_CALL\]\s*\ntool:\s*(\w+)\s*\nparams:\s*({[\s\S]*
 export function parseToolCalls(agentOutput: string): {
     text: string
     toolCalls: ToolCall[]
+    errors: string[]
 } {
+  if (!agentOutput.includes(TOOL_CALL_START)) {
+    return {
+      text: agentOutput.trim(),
+      toolCalls: [],
+      errors: [],
+    }
+  }
+
   const toolCalls: ToolCall[] = []
+  const errors: string[] = []
   let lastIndex = 0
   const textParts: string[] = []
 
-  const regex = new RegExp(TOOL_CALL_REGEX.source, 'g')
-  let match: RegExpExecArray | null
-
-  while ((match = regex.exec(agentOutput)) !== null) {
-    // Collect text before this tool call
-    if (match.index > lastIndex) {
-      textParts.push(agentOutput.slice(lastIndex, match.index))
+  while (lastIndex < agentOutput.length) {
+    const startIndex = agentOutput.indexOf(TOOL_CALL_START, lastIndex)
+    if (startIndex === -1) {
+      textParts.push(agentOutput.slice(lastIndex))
+      break
     }
 
-    const toolName = match[1]
-    const paramsStr = match[2]
-
-    try {
-      const params = JSON.parse(paramsStr)
-      toolCalls.push({ tool: toolName, params })
-    } catch (error) {
-      Logger.warn({ toolName, paramsStr }, 'Failed to parse tool call params as JSON')
-      // Try to still include the tool call with raw params
-      toolCalls.push({ tool: toolName, params: { raw: paramsStr } })
+    if (startIndex > lastIndex) {
+      textParts.push(agentOutput.slice(lastIndex, startIndex))
     }
 
-    lastIndex = match.index + match[0].length
+    const blockStart = startIndex + TOOL_CALL_START.length
+    const endIndex = agentOutput.indexOf(TOOL_CALL_END, blockStart)
+    if (endIndex === -1) {
+      errors.push('Unclosed [TOOL_CALL] block')
+      textParts.push(agentOutput.slice(startIndex))
+      lastIndex = agentOutput.length
+      break
+    }
+
+    const block = agentOutput.slice(blockStart, endIndex)
+    if (block.length > MAX_TOOL_BLOCK_CHARS) {
+      errors.push(`Tool block exceeds max size (${MAX_TOOL_BLOCK_CHARS} chars)`)
+      lastIndex = endIndex + TOOL_CALL_END.length
+      continue
+    }
+
+    const parsed = parseToolCallBlock(block)
+    if (parsed.toolCall) {
+      if (toolCalls.length >= MAX_TOOL_CALLS_PER_RESPONSE) {
+        errors.push(`Exceeded max tool calls per response (${MAX_TOOL_CALLS_PER_RESPONSE})`)
+      } else {
+        toolCalls.push(parsed.toolCall)
+      }
+    } else if (parsed.error) {
+      errors.push(parsed.error)
+    }
+
+    lastIndex = endIndex + TOOL_CALL_END.length
   }
 
-  // Collect remaining text after last tool call
-  if (lastIndex < agentOutput.length) {
-    textParts.push(agentOutput.slice(lastIndex))
+  if (errors.length > 0) {
+    Logger.warn({ errors }, 'Tool call parsing issues detected')
   }
 
   return {
     text: textParts.join('').trim(),
     toolCalls,
+    errors,
   }
 }
 
@@ -65,5 +150,5 @@ export function parseToolCalls(agentOutput: string): {
  * Check if agent output contains any tool calls.
  */
 export function hasToolCalls(agentOutput: string): boolean {
-  return agentOutput.includes('[TOOL_CALL]')
+  return agentOutput.includes(TOOL_CALL_START)
 }

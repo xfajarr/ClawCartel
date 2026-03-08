@@ -150,6 +150,23 @@ const startRunBodySchema = {
   ],
 }
 
+const fixSmartContractBodySchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['errorLog'],
+  properties: {
+    errorLog: {
+      type: 'string',
+      minLength: 1,
+      description: 'Compile/deploy error output to be fixed by BE_SC agent',
+    },
+    programName: {
+      type: 'string',
+      description: 'Optional program name hint in anchor/programs',
+    },
+  },
+}
+
 const unauthorizedErrorResponse = {
   ...errorEnvelopeSchema,
   description: 'Unauthorized',
@@ -394,6 +411,52 @@ const AutonomousSchema = {
     },
   },
 
+  fixSmartContractBuild: {
+    tags: ['Autonomous'],
+    summary: 'Fix smart-contract build',
+    description: 'Run targeted smart-contract maintenance fix on existing run workspace.',
+    params: runParamsSchema,
+    body: fixSmartContractBodySchema,
+    response: {
+      202: {
+        ...successEnvelopeSchema,
+        description: 'Fix workflow started',
+        properties: {
+          ...successEnvelopeSchema.properties,
+          status: { type: 'number', example: 202 },
+          success: { type: 'boolean', example: true },
+          data: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['runId', 'action'],
+            properties: {
+              runId: { type: 'string', format: 'uuid' },
+              action: { type: 'string', enum: ['smart_contract_fix_started'] },
+            },
+          },
+        },
+      },
+      404: {
+        ...errorEnvelopeSchema,
+        description: 'Run not found',
+        properties: {
+          ...errorEnvelopeSchema.properties,
+          status: { type: 'number', example: 404 },
+          success: { type: 'boolean', example: false },
+          error: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['code', 'message'],
+            properties: {
+              code: { type: 'string', example: 'NOT_FOUND' },
+              message: { type: 'string', example: 'Run not found' },
+            },
+          },
+        },
+      },
+    },
+  },
+
   getFiles: {
     tags: ['Autonomous'],
     summary: 'List project files',
@@ -516,6 +579,39 @@ const AutonomousSchema = {
             properties: {
               code: { type: 'string', example: 'INTERNAL_ERROR' },
               message: { type: 'string', example: 'Failed to create zip' },
+            },
+          },
+        },
+      },
+    },
+  },
+
+  downloadPrd: {
+    tags: ['Autonomous'],
+    summary: 'Download approval PRD',
+    description: 'Download the approval-stage PRD markdown for a run',
+    params: runParamsSchema,
+    produces: ['text/markdown'],
+    response: {
+      200: {
+        description: 'PRD markdown file',
+        type: 'string',
+        format: 'binary',
+      },
+      404: {
+        ...errorEnvelopeSchema,
+        description: 'PRD file not found',
+        properties: {
+          ...errorEnvelopeSchema.properties,
+          status: { type: 'number', example: 404 },
+          success: { type: 'boolean', example: false },
+          error: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['code', 'message'],
+            properties: {
+              code: { type: 'string', example: 'NOT_FOUND' },
+              message: { type: 'string', example: 'PRD file not found' },
             },
           },
         },
