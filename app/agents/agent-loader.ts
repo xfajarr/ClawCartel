@@ -6,7 +6,7 @@
  */
 
 import { access, readdir, readFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import Logger from '#app/utils/logger'
 import type {
   AgentRole,
@@ -219,6 +219,24 @@ async function discoverFallbackSkillFiles(skillsDir: string): Promise<string[]> 
   return files.sort((a, b) => a.localeCompare(b))
 }
 
+async function listSkillReferenceMarkdownFiles(skillFilePath: string): Promise<string[]> {
+  if (basename(skillFilePath) !== 'SKILL.md') {
+    return []
+  }
+
+  const skillDir = dirname(skillFilePath)
+  try {
+    const entries = await readdir(skillDir, { withFileTypes: true })
+
+    return entries
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.md') && entry.name !== 'SKILL.md')
+      .map((entry) => entry.name)
+      .sort((a, b) => a.localeCompare(b))
+  } catch {
+    return []
+  }
+}
+
 async function loadModularSkillsMarkdown(agentDir: string): Promise<{ markdown: string; loadedFiles: string[] }> {
   const skillsDir = join(agentDir, 'skills')
   if (!(await fileExists(skillsDir))) {
@@ -241,8 +259,12 @@ async function loadModularSkillsMarkdown(agentDir: string): Promise<{ markdown: 
     if (!content) continue
 
     const relativePath = filePath.slice(agentDir.length + 1).replace(/\\/g, '/')
+    const references = await listSkillReferenceMarkdownFiles(filePath)
+    const referencesBlock = references.length > 0
+      ? `\n\n#### Additional Skill References\n${references.map((name) => `- ${name}`).join('\n')}`
+      : ''
     loadedFiles.push(relativePath)
-    sections.push(`### ${relativePath}\n${content}`)
+    sections.push(`### ${relativePath}\n${content}${referencesBlock}`)
   }
 
   if (sections.length === 0) {

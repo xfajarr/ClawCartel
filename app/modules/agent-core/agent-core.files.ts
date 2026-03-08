@@ -6,8 +6,9 @@ import { promises as fs } from 'fs'
 import * as path from 'path'
 import Logger from '#app/utils/logger'
 import { FileNode, FileChangeEvent } from '#app/modules/agent-core/agent-core.interface'
+import AppConfig from '#app/config/app'
 
-const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || '/home/xfajarr/.openclaw/workspace/claw-cartel-projects'
+const WORKSPACE_ROOT = AppConfig.workspace.root
 const IGNORED_DIRECTORY_NAMES = new Set(['node_modules'])
 
 const DEFAULT_PROJECT_STRUCTURE = [

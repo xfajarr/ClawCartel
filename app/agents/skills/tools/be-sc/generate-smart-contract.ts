@@ -2,6 +2,8 @@ import { chmodSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { ToolHandler, ToolResult } from '#app/agents/skills/skill.types'
 
+const DEFAULT_ANCHOR_VERSION = '0.32.1'
+
 /**
  * generate_smart_contract — Sam scaffolds smart contracts.
  */
@@ -42,6 +44,9 @@ codegen-units = 1
 resolution = true
 skip-lint = false
 
+[toolchain]
+anchor_version = "${DEFAULT_ANCHOR_VERSION}"
+
 [programs.devnet]
 ${name} = "11111111111111111111111111111111"
 
@@ -66,7 +71,7 @@ deploy-devnet = "bash scripts/deploy-devnet.sh"
     "deploy:devnet": "bash scripts/deploy-devnet.sh"
   },
   "devDependencies": {
-    "@coral-xyz/anchor": "^0.30.1",
+    "@coral-xyz/anchor": "^${DEFAULT_ANCHOR_VERSION}",
     "typescript": "^5.6.3"
   }
 }
@@ -93,7 +98,7 @@ no-log-ix-name = []
 idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
-anchor-lang = "0.30.1"
+anchor-lang = "${DEFAULT_ANCHOR_VERSION}"
 `,
       },
       {

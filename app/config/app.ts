@@ -1,8 +1,10 @@
 import dotenv from 'dotenv'
+import path from 'node:path'
 
 dotenv.config()
 
 const port = process.env.APP_PORT ?? '3000'
+const defaultWorkspaceRoot = path.resolve(process.cwd(), 'workspace', 'claw-cartel-projects')
 const AppConfig = {
   app: {
     host: process.env.APP_HOST ?? '0.0.0.0',
@@ -20,10 +22,18 @@ const AppConfig = {
       'utf8'
     ),
   },
+  workspace: {
+    root: process.env.WORKSPACE_ROOT ?? defaultWorkspaceRoot,
+  },
   solana: {
     skipPreflight: process.env.SOLANA_SKIP_PREFLIGHT === 'true',
     rpcUrl: process.env.SOLANA_RPC_URL ?? 'https://api.devnet.solana.com',
     network: process.env.SOLANA_NETWORK ?? 'devnet',
+    deployChunkSize: parseInt(process.env.SOLANA_DEPLOY_CHUNK_SIZE ?? '900'),
+    deployMaxDataLenMultiplier: parseInt(process.env.SOLANA_DEPLOY_MAX_DATA_MULTIPLIER ?? '2'),
+    deployCompileTimeoutMs: parseInt(process.env.SOLANA_DEPLOY_COMPILE_TIMEOUT_MS ?? '900000'),
+    deployAutoRepairEnabled: process.env.SOLANA_DEPLOY_AUTO_REPAIR === 'true',
+    deploySimulationMode: process.env.SOLANA_DEPLOY_SIMULATION_MODE === 'true',
   }
 }
 

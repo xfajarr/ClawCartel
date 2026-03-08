@@ -38,6 +38,12 @@ export default function (
     AutonomousController.continueToDevelopment
   )
 
+  app.post(
+    '/runs/:runId/fix-smart-contract',
+    { schema: AutonomousSchema.fixSmartContractBuild },
+    AutonomousController.fixSmartContractBuild
+  )
+
   app.get(
     '/runs/:runId/files',
     { schema: AutonomousSchema.getFiles },
@@ -54,6 +60,12 @@ export default function (
     '/runs/:runId/download',
     { schema: AutonomousSchema.downloadProject },
     AutonomousController.downloadProject
+  )
+
+  app.get(
+    '/runs/:runId/prd/download',
+    { schema: AutonomousSchema.downloadPrd },
+    AutonomousController.downloadPrd
   )
 
   done()

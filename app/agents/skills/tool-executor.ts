@@ -7,6 +7,7 @@
 import Logger from '#app/utils/logger'
 import type { ToolHandler, ToolResult, ToolContext, ToolCall } from '#app/agents/skills/skill.types'
 import type { AgentRole } from '#app/agents/agent.types'
+import { validateToolParams } from '#app/agents/skills/tool-schemas'
 
 export class ToolExecutor {
   private handlers = new Map<string, ToolHandler>()
@@ -48,13 +49,26 @@ export class ToolExecutor {
       }
     }
 
+    const validation = validateToolParams(toolCall.tool, toolCall.params)
+    if (!validation.valid) {
+      Logger.warn(
+        { tool: toolCall.tool, runId: context.runId, error: validation.error },
+        'Tool params failed schema validation',
+      )
+
+      return {
+        success: false,
+        error: validation.error,
+      }
+    }
+
     try {
       Logger.info(
-        { tool: toolCall.tool, agent: context.agentId, runId: context.runId, params: toolCall.params },
+        { tool: toolCall.tool, agent: context.agentId, runId: context.runId, params: validation.data },
         'Executing tool',
       )
 
-      const result = await handler.execute(toolCall.params, context)
+      const result = await handler.execute(validation.data || toolCall.params, context)
 
       Logger.info(
         { tool: toolCall.tool, success: result.success, runId: context.runId },
@@ -100,6 +114,19 @@ export class ToolExecutor {
      */
   getToolsForRole(role: AgentRole): ToolHandler[] {
     return Array.from(this.handlers.values()).filter(h => h.allowedRoles.includes(role))
+  }
+
+  getTool(toolName: string): ToolHandler | undefined {
+    return this.handlers.get(toolName)
+  }
+
+  listHandlers(): Array<Pick<ToolHandler, 'name' | 'description' | 'allowedRoles' | 'producesFiles'>> {
+    return Array.from(this.handlers.values()).map(handler => ({
+      name: handler.name,
+      description: handler.description,
+      allowedRoles: handler.allowedRoles,
+      producesFiles: handler.producesFiles,
+    }))
   }
 
   /**

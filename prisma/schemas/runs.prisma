@@ -23,6 +23,7 @@ model Run {
 
   agentRuns  AgentRun[]
   events     AgentEvent[]
+  deployments ProgramDeployment[]
 
   @@map("runs")
 }
