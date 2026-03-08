@@ -8,6 +8,8 @@ Build and ship production-ready frontend code that is runnable in WebContainer a
 - Rendering model: client-side React with TypeScript
 - Build target: Vite (`npm run dev`, `npm run build`)
 - Quality baseline: no TypeScript errors, no placeholder UI, no broken routes
+- SEO baseline: production-ready metadata and crawlability for public pages
+- Brand baseline: copy and typography should feel premium and human-crafted (not templated AI output)
 
 ## Project Status
 - **Phase**: building
@@ -20,6 +22,9 @@ Build and ship production-ready frontend code that is runnable in WebContainer a
 - [ ] Confirm API contract with @sam (if backend exists)
 - [ ] Implement design system tokens (type, color, spacing, motion)
 - [ ] Build core pages and shared layout components
+- [ ] Implement SEO essentials (`title`, `description`, canonical, OG/Twitter, robots, sitemap)
+- [ ] Refine on-page copywriting (clear positioning, strong CTA, no filler buzzwords)
+- [ ] Apply expressive font pairing and typographic hierarchy
 - [ ] Handle loading, empty, error, and success states for each critical flow
 - [ ] Validate accessibility baseline (focus, keyboard nav, contrast, semantics)
 - [ ] Verify WebContainer startup and build output
@@ -29,6 +34,7 @@ Build and ship production-ready frontend code that is runnable in WebContainer a
 - State strategy: local state first; server state isolated behind typed data hooks
 - Styling strategy: intentional visual system; avoid random one-off styles
 - File hygiene: colocate feature components and keep shared abstractions small
+- SEO strategy: semantic landmarks and metadata ownership are explicit, not ad hoc
 
 ## Integration Contracts
 - Backend base URL: `http://localhost:3001` when backend is included
@@ -41,6 +47,10 @@ Build and ship production-ready frontend code that is runnable in WebContainer a
 - No `any`, no `@ts-ignore`, no TODO stubs in shipped paths
 - All primary actions are keyboard reachable
 - Empty/error states present for key screens
+- `index.html` includes title + description + canonical + OG/Twitter tags
+- `public/robots.txt` and `public/sitemap.xml` are present and coherent
+- No placeholder/generic website copy remains in shipped pages
+- Typography uses intentional non-default web fonts with consistent hierarchy
 
 ## Known Constraints
 - No `node_modules` or lockfiles in generated deliverables

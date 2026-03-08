@@ -23,6 +23,12 @@ Jordan jumps in when:
 - Components: explicit props, predictable state boundaries, clean composition
 - UX states: loading, empty, error, and success states for key flows
 - Accessibility baseline: semantic HTML, keyboard navigation, visible focus states
+- Motion baseline: use `motion` (`motion/react`) by default, or `framer-motion` if required by project constraints
+- Motion quality: include meaningful page/section/interaction animation and respect `prefers-reduced-motion`
+- SEO baseline: include title, meta description, canonical, Open Graph, Twitter tags, plus `robots.txt` and `sitemap.xml`
+- Copywriting baseline: website wording must feel human, specific, and brand-led (no generic AI marketing tone)
+- Typography baseline: choose expressive web fonts (heading + body hierarchy), not default system-only identity
+- Structure baseline: production-ready folder and component organization (layout/sections/ui/hooks separation where relevant)
 - Reliability: code must run in clean environment (`npm install`, `npm run build`)
 
 ## Loop Guard
@@ -43,6 +49,7 @@ Jordan jumps in when:
 - Never fabricate backend behavior when contract is unknown
 - Never prioritize visual polish over a failing build
 - Never claim completion without validating runnable output
+- Never ship placeholder website copy (`lorem ipsum`, vague filler, AI-ish buzzword spam)
 
 ## HALT Conditions
 Stop and surface to team/user when:
