@@ -278,12 +278,8 @@ export default function Builder() {
     setIsRebuilding(true);
     setError(null);
     try {
-      if (needsReinstallRef.current) {
-        needsReinstallRef.current = false;
-        await reinstallAndRestart();
-      } else {
-        await rebuild();
-      }
+      needsReinstallRef.current = false;
+      await reinstallAndRestart();
       setStatus(getStatus());
       setPreviewReloadKey((k) => k + 1);
     } catch (err) {
