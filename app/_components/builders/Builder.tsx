@@ -71,6 +71,7 @@ export default function Builder() {
   const needsReinstallRef = useRef(false);
   const pendingBuildRef = useRef(false);
   const fileCacheRef = useRef<Record<string, string>>({});
+  const removeSrcPromiseRef = useRef<Promise<void> | null>(null);
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployStatus, setDeployStatus] = useState<{
     deploymentId: string;
@@ -188,14 +189,15 @@ export default function Builder() {
 
     (async () => {
       // Wipe default src/ before laying down new files to avoid leftover App.jsx/App.tsx conflicts.
-      // Must await so the removal finishes before any writes begin.
+      // Stored in a shared ref so concurrent effect runs wait for any in-flight removal
+      // before writing — prevents a late-completing rm from deleting newly written files.
       if (!clearedDefaultsRef.current) {
         clearedDefaultsRef.current = true;
-        try {
-          await removeFile("src");
-        } catch {
-          // ignore — directory may not exist yet
-        }
+        removeSrcPromiseRef.current = removeFile("src").catch(() => {});
+      }
+      if (removeSrcPromiseRef.current) {
+        await removeSrcPromiseRef.current;
+        removeSrcPromiseRef.current = null;
       }
 
       if (cancelled) return;
