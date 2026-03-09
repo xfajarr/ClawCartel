@@ -9,6 +9,7 @@ import {
   readFile,
   rebuild,
   reinstallAndRestart,
+  removeFile,
   setStatusListener,
   setTerminalListener,
   writeFile,
@@ -179,74 +180,83 @@ export default function Builder() {
     const paths = Object.keys(pending);
     if (paths.length === 0 || status !== "ready") return;
 
-    if (!clearedDefaultsRef.current) {
+    let cancelled = false;
+
+    (async () => {
+      // Wipe default src/ before laying down new files to avoid leftover App.jsx/App.tsx conflicts.
+      // Must await so the removal finishes before any writes begin.
+      if (!clearedDefaultsRef.current) {
         clearedDefaultsRef.current = true;
-        // The core module's writeFile creates dirs if missing, but we want to wipe the initial default src directory
-        // before we lay down the new files, so we don't end up with both App.jsx and App.tsx.
-        import("@/app/_libs/webcontainer/core").then(({ removeFile }) => {
-           removeFile("src").catch(() => {});
-        });
-    }
-
-    switchedToCodegenRef.current = false;
-    const writePromises: Promise<string | null>[] = [];
-
-    for (const path of paths) {
-      const content = pending[path];
-      if (content === undefined) continue;
-
-      const localPath = normalizeCodegenPath(path);
-      if (!localPath) {
-        ackCodegenWrite(path);
-        continue;
-      }
-
-      const basename = localPath.split("/").pop() ?? "";
-      if (CONFIG_FILES.includes(basename)) {
-        needsReinstallRef.current = true;
-      }
-
-      const p = (async (): Promise<string | null> => {
         try {
-          await ensureParentDirs(localPath);
-          await writeFile(localPath, content);
-
-          const isCurrentFile = localPath === currentFilePath;
-          const shouldSwitchToCodegen =
-            !switchedToCodegenRef.current &&
-            (currentFilePath === null || DEFAULT_OPEN_FILES.includes(currentFilePath));
-
-          if (isCurrentFile) {
-            if (writeTimeoutRef.current) {
-              clearTimeout(writeTimeoutRef.current);
-              writeTimeoutRef.current = null;
-            }
-            setCode(content);
-          } else if (shouldSwitchToCodegen) {
-            switchedToCodegenRef.current = true;
-            setCurrentFilePath(localPath);
-            setCode(content);
-          }
-
-          setTreeRefreshTrigger((t) => t + 1);
-          return path;
-        } catch (err) {
-          console.error("[Builder] codegen writeFile failed:", err);
-          setError(err instanceof Error ? err.message : "Failed to apply codegen");
-          return null;
+          await removeFile("src");
+        } catch {
+          // ignore — directory may not exist yet
         }
-      })();
-      writePromises.push(p);
-    }
+      }
 
-    // Ack only after all writes finish so we don't re-run effect mid-batch and miss files (e.g. index.html)
-    Promise.all(writePromises).then((results) => {
+      if (cancelled) return;
+
+      switchedToCodegenRef.current = false;
+      const writePromises: Promise<string | null>[] = [];
+
+      for (const path of paths) {
+        const content = pending[path];
+        if (content === undefined) continue;
+
+        const localPath = normalizeCodegenPath(path);
+        if (!localPath) {
+          ackCodegenWrite(path);
+          continue;
+        }
+
+        const basename = localPath.split("/").pop() ?? "";
+        if (CONFIG_FILES.includes(basename)) {
+          needsReinstallRef.current = true;
+        }
+
+        const p = (async (): Promise<string | null> => {
+          try {
+            await ensureParentDirs(localPath);
+            await writeFile(localPath, content);
+
+            const isCurrentFile = localPath === currentFilePath;
+            const shouldSwitchToCodegen =
+              !switchedToCodegenRef.current &&
+              (currentFilePath === null || DEFAULT_OPEN_FILES.includes(currentFilePath));
+
+            if (isCurrentFile) {
+              if (writeTimeoutRef.current) {
+                clearTimeout(writeTimeoutRef.current);
+                writeTimeoutRef.current = null;
+              }
+              setCode(content);
+            } else if (shouldSwitchToCodegen) {
+              switchedToCodegenRef.current = true;
+              setCurrentFilePath(localPath);
+              setCode(content);
+            }
+
+            setTreeRefreshTrigger((t) => t + 1);
+            return path;
+          } catch (err) {
+            console.error("[Builder] codegen writeFile failed:", err);
+            setError(err instanceof Error ? err.message : "Failed to apply codegen");
+            return null;
+          }
+        })();
+        writePromises.push(p);
+      }
+
+      const results = await Promise.all(writePromises);
+      if (cancelled) return;
       const writtenBackendPaths = results.filter((p): p is string => p != null);
       if (writtenBackendPaths.length > 0) {
         ackCodegenWrites(writtenBackendPaths);
         pendingBuildRef.current = true;
       }
-    });
+    })();
+
+    return () => { cancelled = true; };
   }, [codegenPendingWrites, status, currentFilePath, ackCodegenWrite, ackCodegenWrites]);
 
   // Trigger rebuild only when code generation finishes
